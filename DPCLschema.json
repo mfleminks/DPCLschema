@@ -15,6 +15,10 @@
       "type": "string",
       "pattern": "^(\\*|(~)?[a-z][_\\-a-zA-Z0-9]*)$"
     },
+    "scoped_object": {
+      "type": "string",
+      "pattern": "^(\\*|(~)?[a-z][_\\-a-zA-Z0-9]*(\\.[a-z][_\\-a-zA-Z0-9]*)*)$"
+    },
     "atomic_params": {
       "anyOf": [
         {
@@ -48,12 +52,20 @@
         "alias": {
           "$ref": "#/$defs/atomic_object"
         }
-      }
+      },
+      "required": [
+        "reference",
+        "refinement"
+      ],
+      "additionalProperties": false
     },
     "object": {
       "anyOf": [
         {
           "$ref": "#/$defs/atomic_object"
+        },
+        {
+          "$ref": "#/$defs/scoped_object"
         },
         {
           "$ref": "#/$defs/refined_object"
@@ -247,6 +259,21 @@
           "$ref": "#/$defs/event"
         },
         "violation": {
+          "type": "object",
+          "properties": {
+            "expression": {
+              "$ref": "#/$defs/external_expression"
+            },
+            "event": {
+              "$ref": "#/$defs/event"
+            },
+            "alias": {
+              "$ref": "#/$defs/atomic_object"
+            }
+          },
+          "additionalProperties": false
+        },
+        "fulfillment": {
           "type": "object",
           "properties": {
             "expression": {

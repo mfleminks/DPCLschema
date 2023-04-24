@@ -1,0 +1,68 @@
+[
+    {
+        "position": "duty",
+        "holder": "buyer",
+        "action": "#pay",
+        "violation": {
+            "expression": "payment in late"
+        },
+        "alias": "pay_duty"
+    },
+    {
+        "position": "power",
+        "holder": "seller",
+        "action": "#demand",
+        "consequence": {
+            "entity": "payment",
+            "in": "late"
+        },
+        "alias": "demand_payment"
+    },
+    {
+        "event": { "plus": "pay_duty.violated" },
+        "reaction": {
+            "plus": {
+                "position": "power",
+                "holder":"buyer",
+                "action": "#apologize",
+                "consequence": {
+                    "entity": "payment",
+                    "out": "late"
+                },
+                "alias": "apologize"
+            }
+        }
+    },
+    {
+        "event": { "plus": "pay_duty.violated" },
+        "reaction": {
+            "plus": {
+                "position": "power",
+                "alias": "demand_interest",
+                "holder": "seller",
+                "action": "#demand_interest",
+                "consequence": {
+                    "plus": {
+                        "position": "duty",
+                        "alias": "pay_interest",
+                        "holder": "buyer",
+                        "action": {
+                            "reference": "#pay_interest",
+                            "refinement": {
+                                "rate": 5
+                            }
+                        },
+                        "fulfillment": {
+                            "event": {
+                                "reference": "#pay_interest",
+                                "refinement": {
+                                    "rate": 5
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+]

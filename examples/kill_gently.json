@@ -1,0 +1,29 @@
+[
+    {
+        "position": "prohibition",
+        "holder": "*",
+        "action": "#kill",
+        "violation": { "event": "#kill" },
+        "alias": "p_kill"
+    },
+    {
+        "event": { "plus": "p_kill.violated" },
+        "reaction": {
+            "plus": {
+                "position": "duty",
+                "holder": "*",
+                "action": "#kill",
+                "violation": { "event": "#kill" },
+                "fulfillment": {
+                    "event": {
+                        "reference": "#kill",
+                        "refinement": {
+                            "manner": "gently"
+                        }
+                    }
+                },
+                "alias": "d_kill_gently"
+            }
+        }
+    }
+]

@@ -1,0 +1,11 @@
+[
+    {
+        "condition": "d1",
+        "conclusion": {
+            "event": "#timeout",
+            "reaction": {
+                "plus": "!#@!$!@$!@#$"
+            }
+        }
+    }
+]

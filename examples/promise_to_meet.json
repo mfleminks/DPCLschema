@@ -1,0 +1,20 @@
+[
+    {
+        "position": "power",
+        "holder": "bob",
+        "action": "#promise",
+        "consequence": {
+            "plus": {
+                "position": "duty",
+                "holder": "bob",
+                "counterparty": "you",
+                "action": "#meet",
+                "fulfillment": {
+                    "event": "#meet"
+                },
+                "alias": "meet"
+            }
+        },
+        "alias": "promise_to_meet"
+    }
+]
