@@ -335,6 +335,25 @@
       ],
       "additionalProperties": false
     },
+    "import": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "alias": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "active"
+      ],
+      "additionalProperties": false
+    },
     "directive": {
       "oneOf": [
         {

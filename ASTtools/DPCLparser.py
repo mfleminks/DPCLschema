@@ -1,4 +1,5 @@
 import json
+from typing import Tuple, Union
 import jsonschema
 import sys
 import ASTtools.DPCLAst as DPCLAst
@@ -12,21 +13,38 @@ def load_schema(filename):
     return jsonschema.Draft202012Validator(schema)
 
 
-def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator):
+def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -> Tuple[bool, Union[list, Exception]]:
     """
     Load and validate a JSON instance of a DPCL program.
 
-    return: A 2-tuple containing:
-        A bool indicicating success
-        A parsed JSON file on success, or None if the json is invalid.
+    Parameters
+    ----------
+    filename : str
+        The name of the json file to load
+    schema : schema validator
+        The validator to use. Should be Draft202012Validator based on DPCLschema.json
+
+    Returns
+    -------
+    list
+        A parsed JSON file representing a DPCL program,
+        which should be a list containing a number of dicts
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified filename does not exist
+    jsonschema.exceptions.ValidationError
+        If the parsed file is invalid under the given schema
+
+
     """
     with open(filename) as data_file:
         data = json.load(data_file)
-        try:
-            schema.validate(data)
-            return True, data
-        except jsonschema.exceptions.ValidationError as e:
-            return False, e
+
+    schema.validate(data)
+    return data
+
 
 
 if __name__ == "__main__":

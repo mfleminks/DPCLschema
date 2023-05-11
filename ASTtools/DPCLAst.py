@@ -61,10 +61,13 @@ class Namespace:
 
     Parameters
     ----------
-    parent: Namespace, optional
+    parent : Namespace, optional
         The Namespace object for the enclosing scope
+    name : str
+        The Namespace's name, should be unique
     """
-    def __init__(self, parent: Optional['Namespace'] = None) -> None:
+    def __init__(self, name: str, parent: Optional['Namespace'] = None) -> None:
+        self.name = name
         self.__symbol_table = {}
         self.parent = parent
         self.__auto_id_ctr = defaultdict(int)
@@ -114,10 +117,14 @@ class Namespace:
             raise ValueError("Name already exists")
         self.__symbol_table[name] = value
 
+    @property
+    def full_name(self):
+        return f'{self.parent.name}::{self.name}'
+
     def get_auto_id(self, prefix):
         ctr = self.__auto_id_ctr[prefix]
         self.__auto_id_ctr[prefix] += 1
-        return f'_{prefix}{ctr}'
+        return f'{self.full_name}::_{prefix}{ctr}'
 
 
 @dataclass
@@ -153,11 +160,13 @@ class DPCLAstNode:
 @dataclass
 class Program(DPCLAstNode):
     globals: list[DPCLAstNode]
-    namespace: Namespace = field(init=False, default_factory=lambda: Namespace(None))
+    namespace: Namespace = field(init=False)
 
     prefix = "P"
 
     def __post_init__(self):
+        self.namespace = Namespace(self.alias, None)
+
         # Use list to ensure ordering stays consistent
         for obj in self.globals:
             obj.set_parent_namespace(self.namespace)
@@ -166,8 +175,6 @@ class Program(DPCLAstNode):
         #     self.namespace.add(g.id, g)
         #     if g.alias != g.id:
         #         self.namespace.add(g.alias, g)
-
-
 
     @classmethod
     def from_json(cls, globals: list) -> 'Program':
@@ -180,11 +187,12 @@ class CompoundFrame(DPCLAstNode):
     body: List[DPCLAstNode]
     params: List[str]
 
-    namespace: Namespace = field(init=False, default_factory=lambda: Namespace(None))
+    namespace: Namespace = field(init=False)
 
     prefix = "CF"
 
-    # def __post_init__(self, body: list[DPCLAstNode]):
+    def __post_init__(self, body: list[DPCLAstNode]):
+        self.namespace = Namespace(self.alias, None)
     #     for g in body:
     #         self.namespace.add(g.id, g)
     #         if g.alias != g.id:

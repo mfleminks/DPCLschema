@@ -1,11 +1,18 @@
 import cmd
 import json
 from typing import IO
+import os, glob
 
 import jsonschema
 
 # import DPCLparser.DPCLAst as DPCLAst, DPCLparser.DPCLparser as DPCLparser
 from ASTtools import DPCLparser, DPCLAst
+
+
+# Fix delimiters for tab completion
+# taken from https://stackoverflow.com/questions/16826172/filename-tab-completion-in-cmd-cmd-of-python
+import readline
+readline.set_completer_delims(' \t\n')
 
 
 class DPCLShell(cmd.Cmd):
@@ -22,17 +29,34 @@ class DPCLShell(cmd.Cmd):
         print(*args, file=self.file, **kwargs)
 
     def do_load(self, arg):
-        success, data = DPCLparser.load_validate_json(arg, self.schema)
-        if success:
-            print(f"Validation of file passed.")
-        else:
-            print(f"Error while validating file:")
-            print(data)
+        try:
+            data = DPCLparser.load_validate_json(arg, self.schema)
+        except FileNotFoundError:
+            self.print(f"File {arg} does not exist")
+            return
+        except jsonschema.exceptions.ValidationError as e:
+            self.print(f"Error while validating file:")
+            self.print(e)
+            return
 
+        self.print(f"Validation of file passed.")
         self.program = DPCLAst.Program.from_json(data)
 
+    def complete_load(self, text, line, begidx, endidx):
+        # based on https://stackoverflow.com/questions/16826172/filename-tab-completion-in-cmd-cmd-of-python
+        path = text
+        if os.path.isdir(text):
+            path = os.path.join(path, '*')
+        else:
+            path += '*'
+
+        return glob.glob(path)
+
     def do_show(self, arg):
-        print(self.program.namespace.get(arg))
+        self.print(self.program.namespace.get(arg))
+
+    def do_show_all(self, arg):
+        self.print(self.program)
 
 
 if __name__ == '__main__':
