@@ -3,17 +3,26 @@
         "position": "prohibition",
         "holder": "*",
         "action": "#kill",
-        "violation": { "event": "#kill" },
+        "violation": {
+            "event": "#kill"
+        },
         "alias": "p_kill"
     },
     {
-        "event": { "plus": "p_kill.violated" },
+        "event": {
+            "plus": {
+                "scope": "p_kill",
+                "name": "violated"
+            }
+        },
         "reaction": {
             "plus": {
                 "position": "duty",
                 "holder": "*",
                 "action": "#kill",
-                "violation": { "event": "#kill" },
+                "violation": {
+                    "event": "#kill"
+                },
                 "fulfillment": {
                     "event": {
                         "reference": "#kill",

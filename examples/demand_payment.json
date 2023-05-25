@@ -19,11 +19,16 @@
         "alias": "demand_payment"
     },
     {
-        "event": { "plus": "pay_duty.violated" },
+        "event": {
+            "plus": {
+                "scope": "pay_duty",
+                "name": "violated"
+            }
+        },
         "reaction": {
             "plus": {
                 "position": "power",
-                "holder":"buyer",
+                "holder": "buyer",
                 "action": "#apologize",
                 "consequence": {
                     "entity": "payment",
@@ -34,7 +39,12 @@
         }
     },
     {
-        "event": { "plus": "pay_duty.violated" },
+        "event": {
+            "plus": {
+                "scope": "pay_duty",
+                "name": "violated"
+            }
+        },
         "reaction": {
             "plus": {
                 "position": "power",

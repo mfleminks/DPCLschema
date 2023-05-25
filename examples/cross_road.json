@@ -9,7 +9,12 @@
         "alias": "p_cross"
     },
     {
-        "event": { "plus": "p_cross.violated" },
+        "event": {
+            "plus": {
+                "scope": "p_cross",
+                "name": "violated"
+            }
+        },
         "reaction": {
             "plus": {
                 "position": "duty",

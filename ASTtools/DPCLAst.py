@@ -45,8 +45,10 @@ def parse(arg):
             constructor = RefinedEvent
         else:
             constructor = RefinedObject
-    if 'compound' in arg:
+    elif 'compound' in arg:
         constructor = CompoundFrame
+    elif 'scope' in arg and 'name' in arg:
+        constructor = ScopedObject
 
     if not constructor:
         print("Unrecognized")
@@ -95,6 +97,9 @@ class Namespace:
 
         return result
 
+    def get_as_list(self):
+        return list(self.__symbol_table.values())
+
     def add(self, name: str, value: 'DPCLAstNode', overwrite = False):
         """
         Add an attribute to the namespace
@@ -119,7 +124,9 @@ class Namespace:
 
     @property
     def full_name(self):
-        return f'{self.parent.name}::{self.name}'
+        if self.parent is None or self.parent.full_name == "":
+            return self.name
+        return f'{self.parent.full_name}::{self.name}'
 
     def get_auto_id(self, prefix):
         ctr = self.__auto_id_ctr[prefix]
@@ -161,11 +168,12 @@ class DPCLAstNode:
 class Program(DPCLAstNode):
     globals: list[DPCLAstNode]
     namespace: Namespace = field(init=False)
+    id: str
 
     prefix = "P"
 
     def __post_init__(self):
-        self.namespace = Namespace(self.alias, None)
+        self.namespace = Namespace(self.id, None)
 
         # Use list to ensure ordering stays consistent
         for obj in self.globals:
@@ -177,8 +185,8 @@ class Program(DPCLAstNode):
         #         self.namespace.add(g.alias, g)
 
     @classmethod
-    def from_json(cls, globals: list) -> 'Program':
-        return Program(globals=[parse(g) for g in globals], alias=None)
+    def from_json(cls, globals: list, filename: str) -> 'Program':
+        return Program(globals=[parse(g) for g in globals], id=filename, alias=None)
 
 
 @dataclass
@@ -402,6 +410,23 @@ class RefinedObject(DPCLAstNode):
         return RefinedObject(reference=reference,
                              refinement=refinement,
                              alias=alias)
+
+
+@dataclass
+class ScopedObject(DPCLAstNode):
+    scope: object
+    name: str
+
+    prefix = "SO"
+
+    @classmethod
+    def from_json(cls, attrs: dict) -> 'ScopedObject':
+        scope = parse(attrs['scope'])
+        name = attrs['name']
+
+        return ScopedObject(scope=scope,
+                            name=name,
+                            alias=None)
 
 
 @dataclass

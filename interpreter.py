@@ -22,6 +22,8 @@ class DPCLShell(cmd.Cmd):
     def __init__(self, completekey: str = "tab", stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> None:
         super().__init__(completekey, stdin, stdout)
 
+        self.namespace = DPCLAst.Namespace("", None)
+
         with open('DPCLschema.json') as schemaFile:
             self.schema = DPCLparser.load_schema('DPCLschema.json')  # TODO add schema file as clarg/config option
 
@@ -40,7 +42,13 @@ class DPCLShell(cmd.Cmd):
             return
 
         self.print(f"Validation of file passed.")
-        self.program = DPCLAst.Program.from_json(data)
+        # self.program = DPCLAst.Program.from_json(data, arg)
+        program = DPCLAst.Program.from_json(data, arg)
+        try:
+            self.namespace.add(program.id,  program)
+            program.namespace.parent = self.namespace
+        except ValueError:
+            self.print("Error: File already loaded")
 
     def complete_load(self, text, line, begidx, endidx):
         # based on https://stackoverflow.com/questions/16826172/filename-tab-completion-in-cmd-cmd-of-python
@@ -53,10 +61,14 @@ class DPCLShell(cmd.Cmd):
         return glob.glob(path)
 
     def do_show(self, arg):
-        self.print(self.program.namespace.get(arg))
+        if not arg:
+            self.print(self.namespace.get_as_list())
+            return
 
-    def do_show_all(self, arg):
-        self.print(self.program)
+        self.print(self.namespace.get(arg))
+
+    # def do_show_all(self, arg):
+    #     self.print(self.namespace.get_as_list())
 
 
 if __name__ == '__main__':

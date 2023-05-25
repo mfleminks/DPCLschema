@@ -16,8 +16,20 @@
       "pattern": "^(\\*|(~)?[a-z][_\\-a-zA-Z0-9]*)$"
     },
     "scoped_object": {
-      "type": "string",
-      "pattern": "^(\\*|(~)?[a-z][_\\-a-zA-Z0-9]*(\\.[a-z][_\\-a-zA-Z0-9]*)*)$"
+      "type": "object",
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/object"
+        },
+        "name": {
+          "$ref": "#/$defs/unscoped_object"
+        }
+      },
+      "required": [
+        "scope",
+        "name"
+      ],
+      "additionalProperties": false
     },
     "atomic_params": {
       "anyOf": [
@@ -59,13 +71,10 @@
       ],
       "additionalProperties": false
     },
-    "object": {
+    "unscoped_object": {
       "anyOf": [
         {
           "$ref": "#/$defs/atomic_object"
-        },
-        {
-          "$ref": "#/$defs/scoped_object"
         },
         {
           "$ref": "#/$defs/refined_object"
@@ -75,6 +84,16 @@
         },
         {
           "$ref": "#/$defs/deontic_frame"
+        }
+      ]
+    },
+    "object": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/unscoped_object"
+        },
+        {
+          "$ref": "#/$defs/scoped_object"
         }
       ]
     },
