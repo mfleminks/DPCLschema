@@ -16,7 +16,7 @@ readline.set_completer_delims(' \t\n')
 
 
 class DPCLShell(cmd.Cmd):
-    prompt = '> '
+    prompt = '>>> '
     file = None
 
     def __init__(self, completekey: str = "tab", stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> None:
@@ -31,6 +31,7 @@ class DPCLShell(cmd.Cmd):
         print(*args, file=self.file, **kwargs)
 
     def do_load(self, arg):
+        self.prompt = '... '
         try:
             data = DPCLparser.load_validate_json(arg, self.schema)
         except FileNotFoundError:

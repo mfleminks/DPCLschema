@@ -1,0 +1,28 @@
+[
+    {
+        "position": "prohibition",
+        "holder": "*",
+        "action": "#cross",
+        "violation": {
+            "event": "#cross"
+        },
+        "alias": "p_cross"
+    },
+    {
+        "event": {
+            "plus": {
+                "scope": "p_cross",
+                "name": "violated"
+            }
+        },
+        "reaction": {
+            "plus": {
+                "position": "duty",
+                "holder": "*",
+                "action": "#cross",
+                "fulfillment": {
+                    "event": "#cross"
+                },
+                "alias": "d_cross"
+            }
+        }

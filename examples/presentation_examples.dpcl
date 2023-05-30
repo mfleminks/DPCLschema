@@ -1,0 +1,11 @@
+power enroll {
+    holder: student
+    action: #enroll { course: c }
+    consequence: holder in c.member
+}
+
+power stroll {
+    holder: *
+    action: #walk { location: park }
+    consequence: holder out stressed
+}

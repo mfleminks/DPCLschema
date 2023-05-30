@@ -1,3 +1,4 @@
+from builtins import NotImplementedError
 from collections import defaultdict
 from dataclasses import InitVar, dataclass, field
 from typing import ClassVar, Optional, List, TypeAlias, Union
@@ -445,3 +446,90 @@ class RefinedEvent(DPCLAstNode):
         return RefinedEvent(reference=reference,
                             refinement=refinement,
                             alias=alias)
+
+
+class Node:
+    def __init__(self):
+        self.aliases = []
+
+
+class Event(Node):
+    def __init__(self):
+        self.callbacks = []
+
+    def add_callback(self, callback):
+        self.callbacks.append(callback)
+
+    def fire(self):
+        for callback in self.callbacks:
+            callback.fire()
+
+        self.__fire()
+
+    def __fire(self):
+        pass
+
+
+class TransitionEvent(Event):
+    def __init__(self, object, new_state):
+        super().__init__()
+
+        self.object = object
+        self.new_state = new_state
+
+    def __fire(self):
+        self.object.active = self.new_state
+
+
+class NamingEvent(Event):
+    def __init__(self, object: DPCLObject, descriptor, new_state):
+        super().__init__()
+
+        self.object = object
+        self.descriptor = descriptor
+        self.new_state = new_state
+
+    def __fire(self):
+        if self.new_state:
+            self.object.add_descriptor(self.descriptor)
+        else:
+            self.object.remove_descriptor(self.descriptor)
+
+
+class DPCLObject(Node):
+    def __init__(self, active=True):
+        super().__init__()
+
+        self.descriptors = {}
+        self.namespace = Namespace()
+        self.active = active
+
+    @property
+    def children(self):
+        raise NotImplementedError
+
+    def add_descriptor(self, descriptor: DPCLObject):
+        self.descriptors[descriptor.id] = descriptor
+
+    def remove_descriptor(self, descriptor: DPCLObject):
+        del self.descriptors[descriptor.id]
+
+
+class PowerFrame(DPCLObject):
+    def __init__(self, position: str, action, consequence, holder=None, alias=None):
+        super().__init__()
+
+        self.position = position
+        self.action = action
+        self.consequence = consequence
+        self.holder = holder
+        self.alias = alias
+
+    @property
+    def children(self):
+        return [self.action, self.consequence, self.holder]
+
+
+class DeonticFrame(DPCLObject):
+    def __init__(self, position: str, action: Actio):
+        super().__init__()
