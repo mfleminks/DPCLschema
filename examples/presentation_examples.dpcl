@@ -9,3 +9,37 @@ power stroll {
     action: #walk { location: park }
     consequence: holder out stressed
 }
+
+customer.spending >= 5000 -> customer in premium
+
+with customer as c {
+    c.spending >= 5000 -> customer in premium
+}
+
+power askHelpHomework {
+    holder: child
+    counterparty: holder.parent
+    action: #askForHelp
+    consequence: +homeworkDuty(counterparty, holder)
+}
+
+power askHelpHomework {
+    holder: child
+    counterparty: holder.parent
+    action: #askForHelp { target := counterparty }
+    consequence: +homeworkDuty(target, holder)
+}
+
+name
+
+some/long/path/file.json::parent::child
+
+a -> foo in bar
+b -> foo out bar
++a
++b
+
+a -> foo
+#b => -foo
++a
+#b

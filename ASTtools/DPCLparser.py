@@ -8,12 +8,12 @@ import ASTtools.DPCLAst as DPCLAst
 def load_schema(filename):
     with open(filename) as schema_file:
         schema = json.load(schema_file)
-        jsonschema.Draft202012Validator.check_schema(schema)
+        jsonschema.Draft3Validator.check_schema(schema)
 
-    return jsonschema.Draft202012Validator(schema)
+    return jsonschema.Draft3Validator(schema)
 
 
-def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -> Tuple[bool, Union[list, Exception]]:
+def load_validate_json(filename: str, schema: jsonschema.Draft3Validator) -> Tuple[bool, Union[list, Exception]]:
     """
     Load and validate a JSON instance of a DPCL program.
 
@@ -46,14 +46,13 @@ def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -
     return data
 
 
-
 if __name__ == "__main__":
     schema = load_schema('DPCLschema.json')
     success, data = load_validate_json(sys.argv[1], schema)
     if success:
-        print(f"Validation of file passed.")
+        print("Validation of file passed.")
     else:
-        print(f"Error while validating file:")
+        print("Error while validating file:")
         print(data)
 
     parse_result = DPCLAst.Program.from_json(data)

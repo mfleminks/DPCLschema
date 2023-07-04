@@ -361,6 +361,7 @@
           "type": "string"
         },
         "active": {
+          "description": "true means the file is newly imported, false, means the file should be forgotten",
           "type": "boolean"
         },
         "alias": {
