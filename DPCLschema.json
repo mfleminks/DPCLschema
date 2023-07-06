@@ -22,12 +22,35 @@
           "$ref": "#/$defs/object"
         },
         "name": {
-          "$ref": "#/$defs/unscoped_object"
+          "$ref": "#/$defs/object_reference"
         }
       },
       "required": [
         "scope",
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "scoped_event": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/atomic_event"
+            },
+            {
+              "$ref": "#/$defs/refined_event"
+            }
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/event"
+        }
+      },
+      "required": [
+        "scope",
+        "action"
       ],
       "additionalProperties": false
     },
@@ -84,6 +107,16 @@
         },
         {
           "$ref": "#/$defs/deontic_frame"
+        }
+      ]
+    },
+    "object_reference": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/atomic_object"
+        },
+        {
+          "$ref": "#/$defs/refined_object"
         }
       ]
     },

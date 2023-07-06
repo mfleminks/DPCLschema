@@ -1,0 +1,20 @@
+[
+    {
+        "position": "power",
+        "holder": "*",
+        "action": "#register",
+        "consequence": {
+            "entity": "holder",
+            "in": "member"
+        },
+        "alias": "register"
+    },
+    {
+        "compound": "member",
+        "content": []
+    },
+    {
+        "compound": "alice",
+        "content": []
+    }
+]

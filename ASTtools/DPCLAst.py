@@ -8,22 +8,6 @@ from itertools import count
 from typing import ClassVar, Optional, List, TypeAlias, Union, TypeVar
 
 
-TransitionEvent: TypeAlias = Union['ProductionEvent', 'NamingEvent']
-
-
-alias_ctr = 0
-def auto_alias(prefix: str):
-    """
-    Generate an auto-incrementing unique ID.
-    """
-    global alias_ctr
-
-    result = prefix + str(alias_ctr)
-    alias_ctr += 1
-
-    return result
-
-
 POWER_POSITIONS = {'power', 'liability', 'disability', 'immunity'}
 def parse(arg):
     """Constructor dispatch"""
@@ -152,7 +136,7 @@ class Node:
     @property
     def children(self) -> list[Node]:
         """
-        List of this Node's child nodes
+        List of this Node's child nodes, fur use in traversals
         """
         raise NotImplementedError
 
@@ -188,7 +172,6 @@ class Event(Node):
     def __init__(self):
         super().__init__()
 
-        # self.callbacks = []
         self.callbacks = {}
 
     def add_callback(self, callback: Event):
@@ -206,18 +189,19 @@ class Event(Node):
     def fire(self, **kwargs):
         self.notify_callbacks(**kwargs)
 
-    # @staticmethod
-    # def get_event(cls, **kwargs):
-    #     """
-    #     Get a specific instance of an event type.
-    #     kwargs must be the parameters normally passed to the type's constructor.
+    @staticmethod
+    def get_event(**kwargs):
+        """
+        Get a specific instance of an event type.
+        kwargs must be the parameters normally passed to the type's constructor.
 
-    #     Signatures
-    #     ----------
-    #     NamingEvent.get_event(object: DPCLObject, descriptor: DPCLObject, new_state: bool)
-    #     TransitionEvent.get_event(object: DPCLObject, new_state: bool)
-    #     """
-    #     raise NotImplementedError
+        Signatures
+        ----------
+        NamingEvent.get_event(object: GenericObject, descriptor: GenericObject, new_state: bool)
+        TransitionEvent.get_event(object: GenericObject, new_state: bool)
+        Action.get_event(name: str)
+        """
+        raise NotImplementedError
 
     #     self.__fire()
 
@@ -229,7 +213,7 @@ class Event(Node):
 
 
 class ProductionEvent(Event):
-    def __init__(self, object: DPCLObject, new_state: bool):
+    def __init__(self, object: GenericObject, new_state: bool):
         super().__init__()
 
         self.object = object
@@ -244,20 +228,20 @@ class ProductionEvent(Event):
         if self.new_state != old_state:
             self.notify_callbacks(**kwargs)
 
-    # @staticmethod
-    # def get_event(cls, object: DPCLObject, new_state: bool) -> Self:
-    #     return object.get_production_event(new_state)
+    @staticmethod
+    def get_event(object: GenericObject, new_state: bool) -> ProductionEvent:
+        return object.get_production_event(new_state)
 
 
 class NamingEvent(Event):
-    def __init__(self, object: DPCLObject, descriptor: DPCLObject, new_state: bool):
+    def __init__(self, object: GenericObject, descriptor: GenericObject, new_state: bool):
         super().__init__()
 
         self.object = object
         self.descriptor = descriptor
         self.new_state = new_state
 
-    def fire(self, simulate=False, object: DPCLObject = None, descriptor: DPCLObject = None, new_state: bool = None, **kwargs):
+    def fire(self, simulate=False, object: GenericObject = None, descriptor: GenericObject = None, new_state: bool = None, **kwargs):
         """
         Trigger the event, and notify its callbacks if changes were made to the underlying object
 
@@ -281,25 +265,29 @@ class NamingEvent(Event):
         if self.new_state != old_state:
             self.notify_callbacks(**kwargs)
 
-    # @staticmethod
-    # def get_event(cls, object: DPCLObject, descriptor: DPCLObject, new_state: bool) -> Self:
-    #     return object.get_naming_event(descriptor, new_state)
+    @staticmethod
+    def get_event(object: GenericObject, descriptor: GenericObject, new_state: bool) -> NamingEvent:
+        return object.get_naming_event(descriptor, new_state)
 
 
 class Action(Event):
     __instances = {}
 
-    def __init__(self, name: str, refinement: dict, alias: str):
+    def __init__(self, name: str, refinement: dict = {}, alias: str = None):
         super().__init__()
 
         self.name = name
         self.refinement = refinement
-        self.aliases.append(alias)
+        if alias:
+            self.aliases.append(alias)
 
         self.__instances[name] = self
 
     @classmethod
-    def get_event(cls, name: str):
+    def get_event(cls, name: str) -> Action:
+        if name not in cls.__instances:
+            cls.__instances[name] = cls(name)
+
         return cls.__instances[name]
 
     @classmethod
@@ -307,53 +295,8 @@ class Action(Event):
         return Action(name, refinement, alias)
 
 
-# NOTE: probably deprecated
-# class Converter(Event):
-#     def __init__(self, mapping: dict[str, str]):
-#         super().__init__()
-
-#         self.mapping = mapping
-
-#     def fire(self, **kwargs):
-#         # https://stackoverflow.com/a/19189356
-#         # converted_kwargs = rec_dd()
-#         converted_kwargs = {}
-
-#         for new, old in self.mapping.items():
-#             old_path = old.split('.')
-
-#             val = kwargs
-#             for k in old_path:
-#                 val = val[k]
-
-#             new_path = new.split('.')
-#             d = converted_kwargs
-#             # https://stackoverflow.com/a/37704379
-#             for k in new_path[:-1]:
-#                 d = d.setdefault(k, {})
-#             d[new_path[-1]] = val
-
-#         self.notify_callbacks(**converted_kwargs)
-
-
-# class EventPlaceholder(Node):
-#     def __init__(self, event_type: type[Event], /, **kwargs: dict[str, DPCLObject]):
-#         super().__init__()
-
-#         self.event_type = event_type
-#         self.kwargs = kwargs
-
-#     def fire(self, **kwargs: dict[str, DPCLObject]):
-#         event_args = {}
-
-#         for k, v in self.kwargs.items():
-#             event_args[k] = v.resolve(**kwargs)
-
-#         self.event_type.get_event(**event_args).fire()
-
-
 class NamingEventPlaceholder(Node):
-    def __init__(self, object: DPCLObject, descriptor: DPCLObject, new_state: bool):
+    def __init__(self, object: GenericObject, descriptor: GenericObject, new_state: bool):
         super().__init__()
 
         self.object = object
@@ -368,7 +311,7 @@ class NamingEventPlaceholder(Node):
 
 
 class ProductionEventPlaceholder(Node):
-    def __init__(self, object: DPCLObject, new_state: bool):
+    def __init__(self, object: GenericObject, new_state: bool):
         super().__init__()
 
         self.object = object
@@ -380,18 +323,14 @@ class ProductionEventPlaceholder(Node):
         object.get_production_event(self.new_state).fire()
 
 
-class DPCLObject(Node):
-    # __activation_event = None
-    # __deactivation_event = None
-
+class GenericObject(Node):
     def __init__(self, name: str, active=True):
         super().__init__()
 
         self.name = name
 
-        self.descriptors: dict[str, DPCLObject] = {}
-        # Could also be called descriptum
-        self.referents: dict[str, DPCLObject] = {}
+        self.descriptors: dict[str, GenericObject] = {}
+        self.referents: dict[str, GenericObject] = {}
         self.namespace = Namespace(name)
         self.active = active
 
@@ -399,16 +338,15 @@ class DPCLObject(Node):
         self.__production_events = [None, None]
         # Should be indexed with [id: str][state: bool]
         self.__naming_events = defaultdict(lambda: [None, None])
-        # self.__naming_events = {}
 
-    def add_descriptor(self, descriptor: 'DPCLObject'):
+    def add_descriptor(self, descriptor: 'GenericObject'):
         self.descriptors[descriptor.internal_id] = descriptor
         descriptor.referents[self.internal_id] = self
 
         for r in self.referents:
             r.get_naming_event(descriptor, True).fire()
 
-    def remove_descriptor(self, descriptor: 'DPCLObject'):
+    def remove_descriptor(self, descriptor: 'GenericObject'):
         del self.descriptors[descriptor.internal_id]
         del descriptor.referents[self.internal_id]
 
@@ -416,13 +354,13 @@ class DPCLObject(Node):
         for r in self.referents:
             r.get_naming_event(descriptor, False).fire()
 
-    def set_descriptor(self, descriptor: DPCLObject, state: bool):
+    def set_descriptor(self, descriptor: GenericObject, state: bool):
         if state:
             self.add_descriptor(descriptor)
         else:
             self.remove_descriptor(descriptor)
 
-    def has_descriptor(self, descriptor: DPCLObject):
+    def has_descriptor(self, descriptor: GenericObject):
         return descriptor.internal_id in self.descriptors
 
     def get_production_event(self, new_state: bool) -> ProductionEvent:
@@ -445,14 +383,14 @@ class DPCLObject(Node):
 
         return self.__production_events[new_state]
 
-    def get_naming_event(self, descriptor: DPCLObject, new_state: bool) -> NamingEvent:
+    def get_naming_event(self, descriptor: GenericObject, new_state: bool) -> NamingEvent:
         """
         Get the NamingEvent responsible for adding or removing a descriptor to/from this object.
         Creates a new object if it doesn't already exist.
 
         Parameters
         ----------
-        descriptor : DPCLObject
+        descriptor : GenericObject
             The descriptor to be added/removed
         new_state : bool
             Whether to add the descriptor (True) or remove it (False)
@@ -473,25 +411,25 @@ class DPCLObject(Node):
 
         return events[new_state]
 
-    def resolve(self, **kwargs) -> DPCLObject:
+    def resolve(self, **kwargs) -> GenericObject:
         """
-        Resolve an object reference. For regular DPCLObjects, this is the object itself.
+        Resolve an object reference. For regular GenericObjects, this is the object itself.
         Subclasses may use kwargs to return a different object.
 
         Returns
         -------
-        DPCLObject
+        GenericObject
             The object referenced
         """
         return self
 
 
-class ObjectPlaceholder(DPCLObject):
-    def resolve(self, **kwargs) -> DPCLObject:
+class ObjectPlaceholder(GenericObject):
+    def resolve(self, **kwargs) -> GenericObject:
         return kwargs[self.name]
 
 
-class PowerFrame(DPCLObject):
+class PowerFrame(GenericObject):
     def __init__(self, position: str, action, consequence, holder=None, alias=None):
         super().__init__()
 
@@ -507,10 +445,15 @@ class PowerFrame(DPCLObject):
 
     @classmethod
     def from_json(cls, position: str, holder: str, action: str, consequence: dict, alias: str = None) -> PowerFrame:
-        return cls(position, ObjectPlaceholder(holder), Action.get_event(action))
+        if 'plus' in consequence or 'minus' in consequence:
+            consequence = ProductionEventPlaceholder.from_json(consequence)
+        elif 'in' in consequence or 'out' in consequence:
+            consequence = NamingEventPlaceholder.from_json(consequence)
+
+        return cls(position, ObjectPlaceholder(holder), Action.get_event(action), consequence, alias)
 
 
-class DeonticFrame(DPCLObject):
+class DeonticFrame(GenericObject):
     def __init__(self, position: str, action: Action, holder, counterparty, violation, fulfillment):
         super().__init__()
 
@@ -518,14 +461,14 @@ class DeonticFrame(DPCLObject):
         self.action = action
 
 
-class CompoundFrame(DPCLObject):
+class CompoundFrame(GenericObject):
     def __init__(self, params: list[str], content: list):
         super().__init__(active=False)
 
         self.params = params
         self.content = content
 
-    def instantiate(self, args: dict[str, DPCLObject]) -> DPCLObject:
+    def instantiate(self, args: dict[str, GenericObject]) -> GenericObject:
         if not all(p in args for p in self.params):
             # TODO what error should this be?
             raise ValueError
@@ -541,7 +484,7 @@ class CompoundFrame(DPCLObject):
 
 
 class TransformationalRule(Node):
-    def __init__(self, antecedent: DPCLObject, consequent: DPCLObject):
+    def __init__(self, antecedent: GenericObject, consequent: GenericObject):
         super().__init__()
 
         self.antecedent = antecedent
@@ -567,7 +510,7 @@ class ReactiveRule(Node):
         return [self.event, self.reaction]
 
 
-class RefinedObject(DPCLObject):
+class RefinedObject(GenericObject):
     """
     An instance of a parametrized compiund frame.
     Starts off inactive.
@@ -576,10 +519,10 @@ class RefinedObject(DPCLObject):
     ----------
     reference : str
         The name of the compound frame this object is an instance of
-    args : dict[str, DPCLObject]
+    args : dict[str, GenericObject]
         The arguments used to instantiate this object
     """
-    def __init__(self, reference: str, args: dict[str, DPCLObject]):
+    def __init__(self, reference: str, args: dict[str, GenericObject]):
         super().__init__(False)
 
         self.reference = reference

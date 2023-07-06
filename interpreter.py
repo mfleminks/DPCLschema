@@ -6,7 +6,8 @@ import os, glob
 import jsonschema
 
 # import DPCLparser.DPCLAst as DPCLAst, DPCLparser.DPCLparser as DPCLparser
-from ASTtools import DPCLparser, DPCLAst
+from ASTtools import DPCLparser, DPCLAst, visitor
+from ASTtools import nodes, namespace
 
 
 # Fix delimiters for tab completion
@@ -25,7 +26,8 @@ class DPCLShell(cmd.Cmd):
     def __init__(self, completekey: str = "tab", stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> None:
         super().__init__(completekey, stdin, stdout)
 
-        self.namespace = DPCLAst.Namespace("", None)
+        # self.namespace = namespace.Namespace("", None)
+        self.program = nodes.Program('<interpreter>', [])
         self.instruction_buffer = ''
 
         # with open('DPCLschema.json') as schemaFile:
@@ -34,11 +36,31 @@ class DPCLShell(cmd.Cmd):
     def print(self, *args, **kwargs):
         print(*args, file=self.file, **kwargs)
 
+    def precmd(self, line: str) -> str:
+        if self.instruction_buffer:
+
+            line =  'json ' + line
+
+        return line
+
     def do_json(self, arg):
         self.instruction_buffer += arg
         try:
             data = json.loads(self.instruction_buffer)
-            self.schema.validate(data)
+            # schema expects array
+            self.schema.validate([data])
+
+            instruction = nodes.Node.from_json(data)
+            visitor.SymnbolTableBuilder(self.program.namespace).visit(instruction)
+            visitor.NameResolver(self.program.namespace).visit(instruction)
+
+            if isinstance(instruction, nodes.ActionReference):
+                instruction.fire()
+
+            # match instruction:
+            #     case nodes.ReactiveRule(event=None):
+            #         print("firing action")
+            #         instruction.reaction.fire()
 
         except json.JSONDecodeError as e:
             # Error is unexpected EOF: allow user to continue
@@ -55,7 +77,6 @@ class DPCLShell(cmd.Cmd):
         self.instruction_buffer = ''
 
     def do_load(self, arg):
-        self.prompt = '... '
         try:
             data = DPCLparser.load_validate_json(arg, self.schema)
         except FileNotFoundError:
@@ -67,13 +88,15 @@ class DPCLShell(cmd.Cmd):
             return
 
         self.print(f"Validation of file passed.")
-        # self.program = DPCLAst.Program.from_json(data, arg)
-        program = DPCLAst.Program.from_json(data, arg)
-        try:
-            self.namespace.add(program.id,  program)
-            program.namespace.parent = self.namespace
-        except ValueError:
-            self.print("Error: File already loaded")
+        self.program = nodes.Program.from_json(data, arg)
+
+        visitor.SymnbolTableBuilder().visit(self.program)
+        visitor.NameResolver().visit(self.program)
+        # try:
+        #     self.namespace.add(program.name,  program)
+        #     program.namespace.parent = self.namespace
+        # except ValueError:
+        #     self.print("Error: File already loaded")
 
     def complete_load(self, text, line, begidx, endidx):
         # based on https://stackoverflow.com/questions/16826172/filename-tab-completion-in-cmd-cmd-of-python
@@ -87,10 +110,13 @@ class DPCLShell(cmd.Cmd):
 
     def do_show(self, arg):
         if not arg:
-            self.print(self.namespace.get_as_list())
+            self.print(self.program.namespace.as_list())
             return
 
-        self.print(self.namespace.get(arg))
+        self.print(self.program.namespace.get(arg))
+
+    def do_exit(self, arg):
+        return True
 
 
 if __name__ == '__main__':
