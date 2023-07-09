@@ -2,7 +2,7 @@
 
 
 check:
-	python -m unittest tests/*.py
+	python -m pytest
 
 env:
 	python3.10 -m venv env

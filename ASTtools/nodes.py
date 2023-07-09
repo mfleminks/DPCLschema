@@ -101,7 +101,7 @@ class Node:
             else:
                 constructor = DeonticFrame
         elif 'plus' in arg or 'minus' in arg:
-            constructor = ProductionEvent
+            constructor = ProductionEventPlaceholder
         elif 'in' in arg or 'out' in arg:
             constructor = NamingEvent
         elif 'reference' in arg and 'refinement' in arg:
@@ -308,11 +308,25 @@ class Action(Event):
         super().__init__()
 
         self.name = name
-        self.refinement = refinement or {}
+        self.refinement = refinement or {}  # NOTE this is no longer an inherent part of the action
+        self.powers: dict[str, PowerFrame] = {}
         if alias:
             self.aliases.append(alias)
 
         self.__instances[name] = self
+
+    def fire(self, **kwargs):
+        if not any(p.notify(**kwargs) for p in self.powers.values()):
+            print(f"Action {self.name} not enabled by any powers")
+            return False
+
+        return super().fire(**kwargs)
+
+    def add_power(self, power: PowerFrame):
+        self.powers[power.internal_id] = power
+
+    def remove_power(self, power: PowerFrame):
+        del self.powers[power.internal_id]
 
     @classmethod
     def get_event(cls, name: str) -> Action:
@@ -344,7 +358,7 @@ class ActionReference(Event):
         args = {name: ref.resolve() for name, ref in self.args.items()}
         if self.parent is not None:
             args = {**args, 'holder': self.parent.resolve(context=context)}
-        self.action.fire(args=args)
+        self.action.fire(**args)
 
     def visit_children(self, visitor: GenericVisitor):
         self.parent = visitor.visit(self.parent)
@@ -434,9 +448,17 @@ class ProductionEventPlaceholder(Node):
             object = arg['minus']
             new_state = False
 
-        object = Node.from_json(object)
+        object = ObjectReference.from_json(object)
 
         return cls(object, new_state)
+
+
+class EventListener(Node):
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, **kwargs):
+        pass
 
 
 class GenericObject(Node):
@@ -554,7 +576,7 @@ class GenericObject(Node):
         return GenericObject(name, content)
 
     def __repr__(self) -> str:
-        return f"GenericObject:{self.name}{list(self.descriptors.values())}"
+        return f"{'+' if self.active else '-'}{self.__class__.__name__}:{self.name}[{', '.join(d.name for d in list(self.descriptors.values()))}]"
 
 
 class ObjectReference(Node):
@@ -664,9 +686,37 @@ class PowerFrame(GenericObject):
         self.selectors = {name: Selector(val) for name, val in action.args.items()}
         self.selectors['holder'] = self.holder
 
-        self.action.action.add_callback(self)
+        self.action.action.add_power(self)
+
+    def notify(self, **kwargs) -> bool:
+        """
+        Notify this power that its associated action has been called.
+
+        Parameters
+        ----------
+        **kwargs : dict, optional
+            Any arguments passed to the action, including the calling object under the name 'holder'
+
+        Returns
+        -------
+        bool
+            True if the power is active and the action's arguments match those
+            expected by this power, False otherwise.
+        """
+        if not self.active:
+            return False
+
+        if not any(s.matches(kwargs[name], context=self.namespace) for name, s in self.selectors.items()):
+            return False
+
+        context = Namespace('', self.namespace, initial=kwargs)
+        self.consequence.fire(context)
+
+        return True
 
     def fire(self, args: dict[str, GenericObject]):
+        # NOTE deprecated
+
         # print(f"power {self.name} called, {kwargs = }")
         # print(self.action.args)
         # print(f"calling {self.consequence} with {args = }")

@@ -36,6 +36,12 @@ class DPCLShell(cmd.Cmd):
     def print(self, *args, **kwargs):
         print(*args, file=self.file, **kwargs)
 
+    def emptyline(self) -> bool:
+        pass
+
+    def default(self, line):
+        self.do_json(line)
+
     def precmd(self, line: str) -> str:
         if self.instruction_buffer:
 
@@ -54,7 +60,7 @@ class DPCLShell(cmd.Cmd):
             visitor.SymnbolTableBuilder(self.program.namespace).visit(instruction)
             visitor.NameResolver(self.program.namespace).visit(instruction)
 
-            if isinstance(instruction, nodes.ActionReference):
+            if isinstance(instruction, (nodes.ActionReference, nodes.ProductionEventPlaceholder, nodes.NamingEventPlaceholder)):
                 instruction.fire()
 
             # match instruction:

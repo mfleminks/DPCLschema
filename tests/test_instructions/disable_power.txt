@@ -1,0 +1,16 @@
+load examples/register_library.json
+{
+    "reaction": {
+        "minus": "register"
+    }
+}
+{
+    "reaction": {
+        "scope": "alice",
+        "action": "#register"
+    }
+}
+
+show alice
+show register
+exit
