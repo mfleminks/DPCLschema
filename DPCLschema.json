@@ -35,6 +35,9 @@
       "type": "object",
       "properties": {
         "scope": {
+          "$ref": "#/$defs/object_reference"
+        },
+        "action": {
           "oneOf": [
             {
               "$ref": "#/$defs/atomic_event"
@@ -43,9 +46,6 @@
               "$ref": "#/$defs/refined_event"
             }
           ]
-        },
-        "action": {
-          "$ref": "#/$defs/event"
         }
       },
       "required": [
@@ -117,6 +117,9 @@
         },
         {
           "$ref": "#/$defs/refined_object"
+        },
+        {
+          "$ref": "#/$defs/scoped_object"
         }
       ]
     },
@@ -216,7 +219,7 @@
       ],
       "additionalProperties": false
     },
-    "event": {
+    "action": {
       "oneOf": [
         {
           "$ref": "#/$defs/atomic_event"
@@ -225,10 +228,17 @@
           "$ref": "#/$defs/refined_event"
         },
         {
-          "$ref": "#/$defs/transition_event"
+          "$ref": "#/$defs/scoped_event"
+        }
+      ]
+    },
+    "event": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/action"
         },
         {
-          "$ref": "#/$defs/naming_event"
+          "$ref": "#/$defs/transition_event"
         }
       ]
     },
@@ -279,7 +289,7 @@
           "$ref": "#/$defs/object"
         },
         "action": {
-          "$ref": "#/$defs/event"
+          "$ref": "#/$defs/action"
         },
         "consequence": {
           "$ref": "#/$defs/transition_event"
@@ -308,7 +318,7 @@
           "$ref": "#/$defs/object"
         },
         "action": {
-          "$ref": "#/$defs/event"
+          "$ref": "#/$defs/action"
         },
         "violation": {
           "type": "object",
@@ -403,7 +413,7 @@
       },
       "required": [
         "url",
-        "active"
+        "alias"
       ],
       "additionalProperties": false
     },
@@ -423,6 +433,9 @@
         },
         {
           "$ref": "#/$defs/compound_frame"
+        },
+        {
+          "$ref": "#/$defs/action"
         }
       ]
     }

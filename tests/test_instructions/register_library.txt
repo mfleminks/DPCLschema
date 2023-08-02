@@ -1,9 +1,7 @@
 load examples/register_library.json
-json {
-    "reaction": {
-        "scope": "alice",
-        "action": "#register"
-    }
+{
+    "scope": "alice",
+    "action": "#register"
 }
 show alice
 exit

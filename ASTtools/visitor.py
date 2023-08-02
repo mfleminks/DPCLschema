@@ -86,16 +86,25 @@ class SymnbolTableBuilder(GenericVisitor):
 
         self.current_namespace = namespace
 
-    def push_namespace(self, name: str) -> Namespace:
-        self.current_namespace = Namespace(name, self.current_namespace)
-        return self.current_namespace
+    # def push_namespace(self, name: str) -> Namespace:
+    #     self.current_namespace = Namespace(name, self.current_namespace)
+    #     return self.current_namespace
+
+    def push_namespace(self, namespace: Namespace) -> Namespace:
+        """
+        Set the current namespace, and add parent namespace
+        """
+        namespace.parent = self.current_namespace
+        self.current_namespace = namespace
+        return namespace
 
     def pop_namespace(self) -> None:
         self.current_namespace = self.current_namespace.parent
 
     def visitProgram(self, node: nodes.Program):
-        node.namespace = self.push_namespace(node.name)
-        node.init_root_descrptor()
+        # node.namespace = self.push_namespace(node.name)
+        self.push_namespace(node.namespace)
+        # node.init_root_descriptor()
 
         self.visitChildren(node)
 
@@ -104,7 +113,7 @@ class SymnbolTableBuilder(GenericVisitor):
     def visitGenericObject(self, node: nodes.GenericObject):
         self.current_namespace.add(node.name, node)
 
-        node.namespace = self.push_namespace(node.name)
+        node.namespace = self.push_namespace(node.namespace)
 
         self.visitChildren(node)
 
@@ -117,12 +126,33 @@ class SymnbolTableBuilder(GenericVisitor):
 
         return node
 
-    visitDeonticFrame = visitGenericObject
-    visitCompoundFrame = visitGenericObject
-    def visitPowerFrame(self, node: nodes.PowerFrame):
+    def visitDeonticFrame(self, node: nodes.DeonticFrame):
+        raise NotImplementedError
+
+    def visitCompoundFrame(self, node: nodes.CompoundFrame):
         self.current_namespace.add(node.name, node)
 
-        node.namespace = self.push_namespace(node.name)
+        node.namespace = self.push_namespace(node.namespace)
+
+        for name in node.params:
+            # TODO figure out param type; can't import nodes here
+            node.namespace.add(name, None)
+
+        self.visitChildren(node)
+
+        self.pop_namespace()
+
+        return node
+
+    def visitPowerFrame(self, node: nodes.PowerFrame):
+        # try:
+        #     self.current_namespace.add(node.name, node)
+        # except ValueError as e:
+        #     print(e)
+
+        self.current_namespace.add(node.name, node)
+
+        node.namespace = self.push_namespace(node.namespace)
         node.namespace.add('holder', node.holder)
 
         self.visitChildren(node)

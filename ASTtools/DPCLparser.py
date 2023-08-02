@@ -8,12 +8,12 @@ import ASTtools.DPCLAst as DPCLAst
 def load_schema(filename):
     with open(filename) as schema_file:
         schema = json.load(schema_file)
-        jsonschema.Draft3Validator.check_schema(schema)
+        jsonschema.Draft202012Validator.check_schema(schema)
 
-    return jsonschema.Draft3Validator(schema)
+    return jsonschema.Draft202012Validator(schema)
 
 
-def load_validate_json(filename: str, schema: jsonschema.Draft3Validator) -> Tuple[bool, Union[list, Exception]]:
+def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -> Tuple[bool, Union[list, Exception]]:
     """
     Load and validate a JSON instance of a DPCL program.
 

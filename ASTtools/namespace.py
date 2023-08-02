@@ -21,7 +21,7 @@ class Namespace:
     initial : dict[str, nodes.Node], optional
         The intial contents of the symbol table
     """
-    def __init__(self, name: str, parent: Optional['Namespace'] = None, initial: dict[str, nodes.Node] = None) -> None:
+    def __init__(self, name: str, parent: Namespace = None, initial: dict[str, nodes.Node] = None) -> None:
         self.name = name
         self.__symbol_table = initial or {}
         self.parent = parent
@@ -50,14 +50,13 @@ class Namespace:
             When the requested name can't be found
         """
         result = self.__symbol_table.get(name, None)
-        if result is None:
-            if self.parent is not None and recursive:
-                return self.parent.get(name, True)
+        if result is not None:
+            return result
 
-            print(f"can't find {name} in {self.__symbol_table}")
-            raise KeyError
+        if self.parent is not None and recursive:
+            return self.parent.get(name, True)
 
-        return result
+        raise KeyError((f"can't resolve reference '{name}' in namespace {self.name}"))
 
     def as_list(self):
         return list(self.__symbol_table.values())
@@ -91,6 +90,10 @@ class Namespace:
         return f'{self.parent.full_name}::{self.name}'
 
     def get_auto_id(self, prefix):
+        # TODO should the full name be part of the ID?
+        # it might make more sense to just use the prefix+ctr,
+        # and give the object a reference to its parent namespce, so its repr can decide whether to do full
         ctr = self.__auto_id_ctr[prefix]
         self.__auto_id_ctr[prefix] += 1
-        return f'{self.full_name}::_{prefix}{ctr}'
+        return f'_{prefix}{ctr}'
+        # return f'{self.full_name}::_{prefix}{ctr}'

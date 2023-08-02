@@ -37,6 +37,7 @@ class DPCLShell(cmd.Cmd):
         print(*args, file=self.file, **kwargs)
 
     def emptyline(self) -> bool:
+        # Prevent previous command being repreated
         pass
 
     def default(self, line):
@@ -44,8 +45,7 @@ class DPCLShell(cmd.Cmd):
 
     def precmd(self, line: str) -> str:
         if self.instruction_buffer:
-
-            line =  'json ' + line
+            line = 'json ' + line
 
         return line
 
@@ -56,7 +56,7 @@ class DPCLShell(cmd.Cmd):
             # schema expects array
             self.schema.validate([data])
 
-            instruction = nodes.Node.from_json(data)
+            instruction = nodes.from_json(data)
             visitor.SymnbolTableBuilder(self.program.namespace).visit(instruction)
             visitor.NameResolver(self.program.namespace).visit(instruction)
 
