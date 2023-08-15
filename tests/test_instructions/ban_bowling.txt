@@ -1,0 +1,5 @@
+load examples/ban_action.json
+{"agent": "henry_VIII", "action": {"event": "#declare_ban", "refinement": {"#action": "#bowling"}}}
+{"agent": "john_doe", "action": "#bowling"}
+show {"scope": {"object": "banned", "refinement": {"#action": "#bowling"}}, "name": "ban"}
+exit

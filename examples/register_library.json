@@ -1,20 +1,14 @@
 [
+    { "atomics": ["member", "alice"] },
     {
         "position": "power",
         "holder": "*",
         "action": "#register",
         "consequence": {
             "entity": "holder",
-            "in": "member"
+            "gains": true,
+            "descriptor": "member"
         },
         "alias": "register"
-    },
-    {
-        "compound": "member",
-        "content": []
-    },
-    {
-        "compound": "alice",
-        "content": []
     }
 ]

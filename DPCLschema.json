@@ -11,18 +11,99 @@
     "external_expression": {
       "type": "string"
     },
+    "reserved_words": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "(self|super|holder)"
+        },
+        {
+          "$ref": "#/$defs/power_position"
+        },
+        {
+          "$ref": "#/$defs/deontic_position"
+        }
+      ]
+    },
     "atomic_object": {
       "type": "string",
-      "pattern": "^(\\*|(~)?[a-z][_\\-a-zA-Z0-9]*)$"
+      "pattern": "^([a-z][_\\-a-zA-Z0-9]*)$"
+    },
+    "universal_descriptor": {
+      "type": "string",
+      "pattern": "\\*"
+    },
+    "assignable_name": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/atomic_object"
+        },
+        {
+          "not": {
+            "$ref": "#/$defs/reserved_words"
+          }
+        }
+      ],
+      "description": "Names that can be given to objects"
+    },
+    "referencable_name": {
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/atomic_object"
+            },
+            {
+              "$ref": "#/$defs/universal_descriptor"
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "not": {
+                "$ref": "#/$defs/reserved_words"
+              }
+            },
+            {
+              "type": "string",
+              "pattern": "(self|super|holder)"
+            }
+          ]
+        }
+      ],
+      "description": "Names that can be referenced, but not necessarily assigned"
+    },
+    "atomic_object_declarations": {
+      "type": "object",
+      "properties": {
+        "atomics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/assignable_name"
+          }
+        }
+      },
+      "required": [
+        "atomics"
+      ],
+      "additionalProperties": false
     },
     "scoped_object": {
       "type": "object",
       "properties": {
         "scope": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/object_reference"
         },
         "name": {
-          "$ref": "#/$defs/object_reference"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/atomic_object"
+            },
+            {
+              "$ref": "#/$defs/refined_object"
+            }
+          ]
         }
       },
       "required": [
@@ -34,7 +115,7 @@
     "scoped_event": {
       "type": "object",
       "properties": {
-        "scope": {
+        "agent": {
           "$ref": "#/$defs/object_reference"
         },
         "action": {
@@ -49,7 +130,7 @@
         }
       },
       "required": [
-        "scope",
+        "agent",
         "action"
       ],
       "additionalProperties": false
@@ -73,13 +154,38 @@
       "pattern": "^(duty|prohibition|liberty|claim|protection|no-claim)$"
     },
     "refinement": {
-      "type": "object"
+      "type": "object",
+      "propertyNames": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/referencable_name"
+          },
+          {
+            "$ref": "#/$defs/atomic_event"
+          }
+        ]
+      },
+      "patternProperties": {
+        "#": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/atomic_event"
+            },
+            {
+              "$ref": "#/$defs/wildcard_event"
+            }
+          ]
+        },
+        "!#": {
+          "$ref": "#/$defs/object_reference"
+        }
+      }
     },
     "refined_object": {
       "type": "object",
       "properties": {
-        "reference": {
-          "$ref": "#/$defs/atomic_object"
+        "object": {
+          "$ref": "#/$defs/referencable_name"
         },
         "refinement": {
           "$ref": "#/$defs/refinement"
@@ -89,7 +195,7 @@
         }
       },
       "required": [
-        "reference",
+        "object",
         "refinement"
       ],
       "additionalProperties": false
@@ -97,10 +203,7 @@
     "unscoped_object": {
       "anyOf": [
         {
-          "$ref": "#/$defs/atomic_object"
-        },
-        {
-          "$ref": "#/$defs/refined_object"
+          "$ref": "#/$defs/object_reference"
         },
         {
           "$ref": "#/$defs/power_frame"
@@ -113,7 +216,7 @@
     "object_reference": {
       "anyOf": [
         {
-          "$ref": "#/$defs/atomic_object"
+          "$ref": "#/$defs/referencable_name"
         },
         {
           "$ref": "#/$defs/refined_object"
@@ -135,23 +238,25 @@
     },
     "atomic_event": {
       "type": "string",
-      "pattern": "^(~)?#[a-z][_a-zA-Z0-9]*$"
+      "pattern": "^#[a-z][_a-zA-Z0-9]*$"
+    },
+    "wildcard_event": {
+      "type": "string",
+      "pattern": "^#\\*$",
+      "description": "Wildcard action for use as parameter in powers"
     },
     "refined_event": {
       "type": "object",
       "properties": {
-        "reference": {
+        "event": {
           "$ref": "#/$defs/atomic_event"
         },
         "refinement": {
           "$ref": "#/$defs/refinement"
-        },
-        "alias": {
-          "$ref": "#/$defs/atomic_event"
         }
       },
       "required": [
-        "reference",
+        "event",
         "refinement"
       ],
       "additionalProperties": false
@@ -194,28 +299,19 @@
       "type": "object",
       "properties": {
         "entity": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/object_reference"
         },
-        "in": {
-          "$ref": "#/$defs/object"
+        "descriptor": {
+          "$ref": "#/$defs/object_reference"
         },
-        "out": {
-          "$ref": "#/$defs/object"
+        "gains": {
+          "$ref": "#/$defs/boolean_literal"
         }
       },
-      "oneOf": [
-        {
-          "required": [
-            "entity",
-            "in"
-          ]
-        },
-        {
-          "required": [
-            "entity",
-            "out"
-          ]
-        }
+      "required": [
+        "entity",
+        "gains",
+        "descriptor"
       ],
       "additionalProperties": false
     },
@@ -242,14 +338,63 @@
         }
       ]
     },
+    "descriptor_condition": {
+      "type": "object",
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/object_reference"
+        },
+        "has": {
+          "$ref": "#/$defs/boolean_literal"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/object_reference"
+        }
+      },
+      "required": [
+        "entity",
+        "has",
+        "descriptor"
+      ]
+    },
+    "boolean_negation": {
+      "type": "object",
+      "properties": {
+        "negate": {
+          "$ref": "#/$defs/boolean_expression"
+        }
+      },
+      "required": [
+        "negate"
+      ]
+    },
+    "boolean_literal": {
+      "type": "boolean"
+    },
+    "boolean_expression": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/object_reference"
+        },
+        {
+          "$ref": "#/$defs/descriptor_condition"
+        },
+        {
+          "$ref": "#/$defs/boolean_literal"
+        },
+        {
+          "$ref": "#/$defs/boolean_negation"
+        }
+      ]
+    },
     "transformational_rule": {
       "type": "object",
       "properties": {
         "condition": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/boolean_expression"
         },
         "conclusion": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/boolean_expression"
         },
         "alias": {
           "$ref": "#/$defs/atomic_object"
@@ -286,16 +431,23 @@
           "$ref": "#/$defs/power_position"
         },
         "holder": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/object_reference"
         },
         "action": {
-          "$ref": "#/$defs/action"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/atomic_event"
+            },
+            {
+              "$ref": "#/$defs/refined_event"
+            }
+          ]
         },
         "consequence": {
           "$ref": "#/$defs/transition_event"
         },
         "alias": {
-          "$ref": "#/$defs/atomic_object"
+          "$ref": "#/$defs/assignable_name"
         }
       },
       "required": [
@@ -312,10 +464,10 @@
           "$ref": "#/$defs/deontic_position"
         },
         "holder": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/object_reference"
         },
         "counterparty": {
-          "$ref": "#/$defs/object"
+          "$ref": "#/$defs/object_reference"
         },
         "action": {
           "$ref": "#/$defs/action"
@@ -324,30 +476,32 @@
           "type": "object",
           "properties": {
             "expression": {
-              "$ref": "#/$defs/external_expression"
+              "$ref": "#/$defs/boolean_expression"
             },
             "event": {
               "$ref": "#/$defs/event"
-            },
-            "alias": {
-              "$ref": "#/$defs/atomic_object"
             }
           },
+          "oneOf": [
+            { "required": ["expression"] },
+            { "required": ["event"] }
+          ],
           "additionalProperties": false
         },
         "fulfillment": {
           "type": "object",
           "properties": {
             "expression": {
-              "$ref": "#/$defs/external_expression"
+              "$ref": "#/$defs/boolean_expression"
             },
             "event": {
               "$ref": "#/$defs/event"
-            },
-            "alias": {
-              "$ref": "#/$defs/atomic_object"
             }
           },
+          "oneOf": [
+            { "required": ["expression"] },
+            { "required": ["event"] }
+          ],
           "additionalProperties": false
         },
         "termination": {
@@ -360,6 +514,10 @@
               "$ref": "#/$defs/event"
             }
           },
+          "oneOf": [
+            { "required": ["expression"] },
+            { "required": ["event"] }
+          ],
           "additionalProperties": false
         },
         "alias": {
@@ -375,24 +533,31 @@
     "compound_frame": {
       "type": "object",
       "properties": {
-        "compound": {
-          "$ref": "#/$defs/atomic_object"
+        "object": {
+          "$ref": "#/$defs/assignable_name"
         },
         "params": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/atomic_params"
-          }
+          },
+          "minItems": 1
         },
         "content": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/directive"
           }
+        },
+        "initial_descriptors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/object_reference"
+          }
         }
       },
       "required": [
-        "compound",
+        "object",
         "content"
       ],
       "additionalProperties": false
@@ -400,12 +565,8 @@
     "import": {
       "type": "object",
       "properties": {
-        "url": {
+        "import": {
           "type": "string"
-        },
-        "active": {
-          "description": "true means the file is newly imported, false, means the file should be forgotten",
-          "type": "boolean"
         },
         "alias": {
           "type": "string"
@@ -435,7 +596,10 @@
           "$ref": "#/$defs/compound_frame"
         },
         {
-          "$ref": "#/$defs/action"
+          "$ref": "#/$defs/event"
+        },
+        {
+          "$ref": "#/$defs/atomic_object_declarations"
         }
       ]
     }

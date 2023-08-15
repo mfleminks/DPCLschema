@@ -1,0 +1,8 @@
+[
+    {"compound": "foo", "content": []},
+    {"compound": "bar", "content": []},
+    {
+        "condition": "foo",
+        "conclusion": "bar"
+    }
+]

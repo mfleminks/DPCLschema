@@ -9,29 +9,46 @@ from builtins import NotImplementedError
 from copy import copy
 
 
+# Prevent recursive imports
 if TYPE_CHECKING:
     import ASTtools.nodes as nodes
 
 
 class GenericVisitor:
-    def start(self, node: nodes.Node):
-        self.on_start()
+    def __init__(self) -> None:
+        self.running = False
+        self.stack = []
 
-        self.visit(node)
+    @property
+    def current_depth(self) -> int:
+        """
+        Current recursion depth of the traversal, including the node
+        curerntly being visited (i.e. at the root node current_depth == 1)
+        """
+        return len(self.stack)
 
-        self.on_finish()
+    def run(self, node: nodes.Node):
+        if self.running:
+            # TODO exception type
+            raise Exception("Visitor is already running")
 
-    def on_start(self):
-        pass
+        self.running = True
 
-    def on_finish(self):
-        pass
+
+        result = self.visit(node)
+
+        self.running = False
+
+        return result
 
     def visit(self, node: nodes.Node):
         if node is None:
             return node
 
-        return node.accept(self)
+        self.stack.append(node)
+        result = node.accept(self)
+        self.stack.pop()
+        return result
 
     def visitChildren(self, node: nodes.Node):
         node.visit_children(self)
@@ -58,156 +75,169 @@ class GenericVisitor:
     def visitDeonticFrame(self, node: nodes.DeonticFrame):
         return self.visitNode(node)
 
-    def visitProductionEvent(self, node: nodes.ProductionEvent):
+    def visitProductionEventReference(self, node: nodes.ProductionEventReference):
         return self.visitNode(node)
 
-    def visitNamingEvent(self, node: nodes.NamingEvent):
+    def visitNamingEventReference(self, node: nodes.NamingEventReference):
         return self.visitNode(node)
 
-    def visitAction(self, node: nodes.Action):
+    def visitActionReference(self, node: nodes.ActionReference):
         return self.visitNode(node)
 
     def visitObjectReference(self, node: nodes.ObjectReference):
         return self.visitNode(node)
-
-    def visitGenericObject(self, node: nodes.Action):
-        return self.visitNode(node)
-
-    # def visitRefinedObject(self, node: nodes.RefinedObject):
-    #     return self.visitNode(node)
-
-    # def visitScopedObject(self, node: nodes.ScopedObject):
-    #     return self.visitNode(node)
-
-
-class SymnbolTableBuilder(GenericVisitor):
-    def __init__(self, namespace: Namespace = None) -> None:
-        super().__init__()
-
-        self.current_namespace = namespace
-
-    # def push_namespace(self, name: str) -> Namespace:
-    #     self.current_namespace = Namespace(name, self.current_namespace)
-    #     return self.current_namespace
-
-    def push_namespace(self, namespace: Namespace) -> Namespace:
-        """
-        Set the current namespace, and add parent namespace
-        """
-        namespace.parent = self.current_namespace
-        self.current_namespace = namespace
-        return namespace
-
-    def pop_namespace(self) -> None:
-        self.current_namespace = self.current_namespace.parent
-
-    def visitProgram(self, node: nodes.Program):
-        # node.namespace = self.push_namespace(node.name)
-        self.push_namespace(node.namespace)
-        # node.init_root_descriptor()
-
-        self.visitChildren(node)
-
-        self.pop_namespace()
 
     def visitGenericObject(self, node: nodes.GenericObject):
-        self.current_namespace.add(node.name, node)
+        return self.visitNode(node)
 
-        node.namespace = self.push_namespace(node.namespace)
+    def visitAtomicDeclarations(self, node: nodes.AtomicDeclarations):
+        return self.visitNode(node)
 
+    def visitDescriptorCondition(self, node: nodes.DescriptorCondition):
+        return self.visitNode(node)
+
+
+class CompoundInstantiator(GenericVisitor):
+    def __init__(self) -> None:
+        super().__init__()
+
+        # Must be imported locally to avoid circular imports
+        from ASTtools.nodes import GenericObject
+        self.constructor = GenericObject
+
+    def run(self, node: nodes.CompoundFrame, new_name: str, new_namespace: Namespace) -> nodes.CompoundFrame:
+        """
+        Parameters
+        ----------
+        node : CompoundFrame
+            The compound to instantiate
+        new_namespace : Namepspace
+            The namespace for the newly created instance. Should be empty
+            except for any arguments that are used for instantiation.
+        """
+        self.namespace_mapping = {}
+        # self.new_name = new_name
+        self.new_namespace = new_namespace
+        self.new_name = new_name
+
+        return super().run(node)
+
+    def visitNode(self, node: nodes.Node):
+        result = copy(node)
         self.visitChildren(node)
-
-        self.pop_namespace()
-
-        return node
-
-    def visitObjectReference(self, node: nodes.ObjectReference):
-        node.local_namespace = self.current_namespace
-
-        return node
-
-    def visitDeonticFrame(self, node: nodes.DeonticFrame):
-        raise NotImplementedError
+        return result
 
     def visitCompoundFrame(self, node: nodes.CompoundFrame):
-        self.current_namespace.add(node.name, node)
+        # Ensure we don't modify nested compounds
+        if node is not self.stack[0]:
+            # return self.visitGenericObject(node)
+            return node
 
-        node.namespace = self.push_namespace(node.namespace)
+        result = self.constructor(self.new_name, node.body.copy())
+        result.namespace = self.new_namespace
+        result.body = node.body.copy()
 
-        for name in node.params:
-            # TODO figure out param type; can't import nodes here
-            node.namespace.add(name, None)
+        # result = copy(node)
+
+        # result.name = self.new_name
+        # result.namespace = self.new_namespace
+
+        self.namespace_mapping[node.namespace] = self.new_namespace
+
+        result.visit_children(self)
+
+        # Must be done after visiting children to avoid recursion
+        result.initial_descriptors = [node]
+        result.add_initial_descriptors()
+
+        return result
+
+    def visitGenericObject(self, node: nodes.GenericObject):
+        result = copy(node)
+        result.body = node.body.copy()
+        # result.namespace = copy(result.namespace)
+        result.namespace = Namespace(node.name, node.namespace.parent)
+
+        self.namespace_mapping[node.namespace] = result.namespace
+
+        # result.visit_children(self)
+        self.visitChildren(result)
+        return result
+
+    def visitPowerFrame(self, node: nodes.PowerFrame):
+        return self.visitGenericObject(node)
+
+    def visitDeonticFrame(self, node: nodes.DeonticFrame):
+        return self.visitGenericObject(node)
+
+    # def visitObjectReference(self, node: nodes.ObjectReference):
+    #     # if reference points to namespace outside instantiated compound, leave it as is
+    #     node.local_namespace = self.namespace_mapping.get(node.local_namespace, node.local_namespace)
+
+    #     # if node.references_param:
+    #     #     # node.references_param = False
+    #     #     node.object = node.resolve(context=self.new_namespace)
+
+    #     return node
+
+
+class ASTLinker(GenericVisitor):
+    """
+    Visitor for assigning owner and parent references to nodes, and parents to namespaces.
+    """
+    def __init__(self, parent: nodes.Node = None, owner: nodes.Node = None) -> None:
+        super().__init__()
+
+        self.parent_node = parent
+        self.current_scope = owner
+
+    def visitNode(self, node: nodes.Node):
+        node.owner = self.current_scope
+        node.parent_node = self.parent_node
+        self.parent_node = node
 
         self.visitChildren(node)
 
-        self.pop_namespace()
+        self.parent_node = node.parent_node
+
+        return node
+
+    def visitProgram(self, node: nodes.Program):
+        node.owner = self.current_scope
+        node.parent_node = self.parent_node
+        self.current_scope = node
+        self.parent_node = node
+
+        self.visitChildren(node)
+
+        self.parent_node = node.parent_node
+        self.current_scope = node.owner
+
+        return node
+
+    def visitGenericObject(self, node: nodes.GenericObject):
+        result = self.visitProgram(node)
+        node.namespace.parent = node.owner.namespace
+        return result
+        # node.owner = self.current_scope
+        # self.current_scope = node
+
+        # self.visitChildren(node)
+
+        # self.current_scope = node.owner
+
+        # return node
+
+    def visitCompoundFrame(self, node: nodes.CompoundFrame):
+        # return self.visitGenericObject(node)
+        # uninstantiated compounds should not be linked
+        node.owner = self.current_scope
+        node.parent_node = self.parent_node
 
         return node
 
     def visitPowerFrame(self, node: nodes.PowerFrame):
-        # try:
-        #     self.current_namespace.add(node.name, node)
-        # except ValueError as e:
-        #     print(e)
+        return self.visitGenericObject(node)
 
-        self.current_namespace.add(node.name, node)
-
-        node.namespace = self.push_namespace(node.namespace)
-        node.namespace.add('holder', node.holder)
-
-        self.visitChildren(node)
-
-        self.pop_namespace()
-
-        return node
-
-
-class NameResolver(GenericVisitor):
-    def __init__(self, namespace: Namespace = None) -> None:
-        super().__init__()
-
-        self.in_slot = None
-        self.error = False
-
-        self.current_namespace = namespace
-
-    def on_finish(self):
-        super().on_finish()
-
-        if self.error:
-            # TODO exception type
-            raise Exception
-
-    def pop_namespace(self) -> None:
-        self.current_namespace = self.current_namespace.parent
-
-    def visitProgram(self, node: nodes.Program):
-        self.current_namespace = node.namespace
-
-        self.visitChildren(node)
-
-        self.pop_namespace()
-
-    def visitObjectReference(self, node: nodes.ObjectReference):
-        node.resolve(save=True)
-
-        return node
-        # try:
-        #     node.object = self.current_namespace.get(node.name)
-        # except KeyError:
-        #     if self.in_slot != 'consequence':
-        #         self.error = True
-        #         print("cannot resolve reference")
-
-
-class ASTCopier(GenericVisitor):
-    """
-    Visitor that returns a copy of a node tree.
-
-    Only child nodes are deep copied. All other attributes are shallow copied,
-    i.e.original.name is copy.name
-    """
-    def visitNode(self, node: nodes.Node):
-        node = copy(node)
-        node.visit_children(self)
-        return node
+    def visitDeonticFrame(self, node: nodes.DeonticFrame):
+        return self.visitGenericObject(node)

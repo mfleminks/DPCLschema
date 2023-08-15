@@ -1,0 +1,27 @@
+load examples/library2.json
+{
+    "agent": "alice",
+    "action": "#register"
+}
+show "alice"
+{
+    "agent": "alice",
+    "action": {
+        "event": "#borrow",
+        "refinement": {
+            "item": "dracula"
+        }
+    }
+}
+show
+{
+    "agent": "alice",
+    "action": {
+        "event": "#return",
+        "refinement": {
+            "item": "dracula"
+        }
+    }
+}
+show
+exit

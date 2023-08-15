@@ -4,7 +4,7 @@
         "holder": "buyer",
         "action": "#pay",
         "violation": {
-            "expression": "payment in late"
+            "expression": true
         },
         "alias": "pay_duty"
     },

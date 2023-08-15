@@ -4,6 +4,9 @@ from collections import defaultdict
 from typing import Optional, Union, TYPE_CHECKING
 
 
+from ASTtools import exceptions
+
+
 if TYPE_CHECKING:
     import nodes
 
@@ -46,22 +49,39 @@ class Namespace:
 
         Raises
         ------
-        KeyError
+        DPCLNameError
             When the requested name can't be found
         """
+        # print(f"searching name '{name}' in namespace {self.full_name}")
         result = self.__symbol_table.get(name, None)
         if result is not None:
             return result
 
         if self.parent is not None and recursive:
-            return self.parent.get(name, True)
+            try:
+                return self.parent.get(name, True)
+            except exceptions.DPCLNameError:
+                raise exceptions.DPCLNameError((f"can't resolve reference '{name}' in namespace {self.full_name}"))
 
-        raise KeyError((f"can't resolve reference '{name}' in namespace {self.name}"))
+        raise exceptions.DPCLNameError((f"can't resolve reference '{name}' in namespace {self.full_name}"))
 
     def as_list(self):
-        return list(self.__symbol_table.values())
+        return list(self.__symbol_table.items())
 
-    def add(self, name: str, value: nodes.Node, overwrite = False):
+    def print(self):
+        for name, value in self.__symbol_table.items():
+            # skip auto-IDs
+            if name.startswith('_'):
+                continue
+
+            print(f"{name}: {value}")
+            # Print a compound's instances
+            try:
+                value.print_instances()
+            except AttributeError:
+                pass
+
+    def add(self, name: str, value: nodes.Node, auto_id=True, overwrite=False):
         """
         Add an attribute to the namespace
 
@@ -71,25 +91,36 @@ class Namespace:
             The name of the attribute
         value : DPCLAstNode
             The object itself
+        auto_id : bool, default True
+            If True, the value is also added under an auto-generated ID, as defined by `get_auto_id`
         overwrite : bool, default False
-            If set to True, a pre-existing object of the same name will be overwritten
+            If True, a pre-existing object of the same name will be overwritten
 
         Raises
         ------
-        ValueError
+        DPCLNameError
             If the name is already in use and overwrite is set to False
         """
         if name in self.__symbol_table and not overwrite:
-            raise ValueError(f"Name {name} already exists in namespace {self.full_name}")
-        self.__symbol_table[name] = value
+            raise exceptions.DPCLNameError(f"Name {name} already exists in namespace {self.full_name}")
+
+        if name is not None:
+            self.__symbol_table[name] = value
+
+        if auto_id:
+            self.__symbol_table[self.get_auto_id(value.prefix)] = value
 
     @property
     def full_name(self) -> str:
         if self.parent is None or self.parent.full_name == "":
             return self.name
+
         return f'{self.parent.full_name}::{self.name}'
 
-    def get_auto_id(self, prefix):
+    def get_auto_id(self, prefix) -> str:
+        """
+        Create a new auto-incrementing ID. This takes the form `_<prefix><counter>`.
+        """
         # TODO should the full name be part of the ID?
         # it might make more sense to just use the prefix+ctr,
         # and give the object a reference to its parent namespce, so its repr can decide whether to do full

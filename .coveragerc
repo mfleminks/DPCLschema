@@ -1,0 +1,7 @@
+[run]
+omit =
+    tests/*
+    DPCLtest.py
+
+[report]
+skip_empty = True

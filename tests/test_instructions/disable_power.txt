@@ -11,6 +11,6 @@ load examples/register_library.json
     }
 }
 
-show alice
-show register
+show "alice"
+show "register"
 exit

@@ -1,0 +1,6 @@
+{
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "title": "DPCL Object Reference",
+    "description": "This is a schema representing an object reference in DPCL, for separate validation by the REPL",
+    "$ref": "file://DPCLschema.json#/$defs/object_reference"
+}

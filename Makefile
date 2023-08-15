@@ -1,8 +1,8 @@
-.PHONY: cehck
+.PHONY: check
 
 
 check:
-	python -m pytest
+	python -m pytest --cov=.
 
 env:
 	python3.10 -m venv env

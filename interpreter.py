@@ -6,7 +6,7 @@ import os, glob
 import jsonschema
 
 # import DPCLparser.DPCLAst as DPCLAst, DPCLparser.DPCLparser as DPCLparser
-from ASTtools import DPCLparser, DPCLAst, visitor
+from ASTtools import DPCLparser, exceptions, visitor
 from ASTtools import nodes, namespace
 
 
@@ -33,6 +33,8 @@ class DPCLShell(cmd.Cmd):
         # with open('DPCLschema.json') as schemaFile:
         self.schema = DPCLparser.load_schema('DPCLschema.json')  # TODO add schema file as clarg/config option
 
+        # self.obj_ref_schema = DPCLparser.load_schema('object_ref_schema.json', set_default=False)
+
     def print(self, *args, **kwargs):
         print(*args, file=self.file, **kwargs)
 
@@ -49,6 +51,15 @@ class DPCLShell(cmd.Cmd):
 
         return line
 
+    def execute_statement(self, statement: nodes.Statement):
+        try:
+            statement.execute()
+        except exceptions.DPCLException as e:
+            self.print(e)
+            self.print("Fatal Error: Execution aborted and program wiped")
+
+            self.program = nodes.Program('<interpreter>', [])
+
     def do_json(self, arg):
         self.instruction_buffer += arg
         try:
@@ -56,17 +67,10 @@ class DPCLShell(cmd.Cmd):
             # schema expects array
             self.schema.validate([data])
 
-            instruction = nodes.from_json(data)
-            visitor.SymnbolTableBuilder(self.program.namespace).visit(instruction)
-            visitor.NameResolver(self.program.namespace).visit(instruction)
+            instruction: nodes.Statement = nodes.from_json(data)
 
-            if isinstance(instruction, (nodes.ActionReference, nodes.ProductionEventPlaceholder, nodes.NamingEventPlaceholder)):
-                instruction.fire()
-
-            # match instruction:
-            #     case nodes.ReactiveRule(event=None):
-            #         print("firing action")
-            #         instruction.reaction.fire()
+            visitor.ASTLinker(self.program, self.program).run(instruction)
+            self.execute_statement(instruction)
 
         except json.JSONDecodeError as e:
             # Error is unexpected EOF: allow user to continue
@@ -91,13 +95,17 @@ class DPCLShell(cmd.Cmd):
         except jsonschema.exceptions.ValidationError as e:
             self.print(f"Error while validating file:")
             self.print(e)
+            # for error in self.schema.iter_errors(data)
             return
 
         self.print(f"Validation of file passed.")
-        self.program = nodes.Program.from_json(data, arg)
+        self.program = nodes.Program.from_json(data, filename=arg)
 
-        visitor.SymnbolTableBuilder().visit(self.program)
-        visitor.NameResolver().visit(self.program)
+        # visitor.SymnbolTableBuilder().visit(self.program)
+        # visitor.NameResolver().visit(self.program)
+
+        # self.program.execute()
+        self.execute_statement(self.program)
         # try:
         #     self.namespace.add(program.name,  program)
         #     program.namespace.parent = self.namespace
@@ -116,10 +124,14 @@ class DPCLShell(cmd.Cmd):
 
     def do_show(self, arg):
         if not arg:
-            self.print(self.program.namespace.as_list())
+            # self.print(*self.program.namespace.as_list(), sep="\n")
+            self.program.namespace.print()
             return
 
-        self.print(self.program.namespace.get(arg))
+        # self.print(self.program.get_variable(arg))
+        ref = nodes.ObjectReference.from_json(json.loads(arg))
+        visitor.ASTLinker(self.program, self.program).run(ref)
+        self.print(ref.resolve())
 
     def do_exit(self, arg):
         return True

@@ -1,0 +1,52 @@
+[
+    { "atomics": ["king", "peasant", "went_bowling"] },
+    {
+        "object": "henry_VIII",
+        "content": [],
+        "initial_descriptors": [ "king" ]
+    },
+    {
+        "object": "john_doe",
+        "content": [],
+        "initial_descriptors": [ "peasant" ]
+    },
+    {
+        "position": "power",
+        "action": "#bowling",
+        "consequence": {
+            "entity": "holder",
+            "gains": true,
+            "descriptor": "went_bowling"
+        }
+    },
+    {
+        "position": "power",
+        "holder": "king",
+        "action": {
+            "event": "#declare_ban",
+            "refinement": {
+                "#action": "#*"
+            }
+        },
+        "consequence": {
+            "plus": {
+                "object": "banned",
+                "refinement": {
+                    "#action": "#action"
+                }
+            }
+        }
+    },
+    {
+        "object": "banned",
+        "params": ["#action"],
+        "content": [
+            {
+                "position": "prohibition",
+                "holder": "peasant",
+                "action": "#action",
+                "alias": "ban"
+            }
+        ]
+    }
+]

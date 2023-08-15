@@ -1,19 +1,28 @@
 import json
 from typing import Tuple, Union
 import jsonschema
-import sys
-import ASTtools.DPCLAst as DPCLAst
+# import sys
+# import ASTtools.DPCLAst as DPCLAst
 
 
-def load_schema(filename):
+def load_schema(filename, set_default=True):
     with open(filename) as schema_file:
-        schema = json.load(schema_file)
-        jsonschema.Draft202012Validator.check_schema(schema)
+        data = json.load(schema_file)
+        jsonschema.Draft202012Validator.check_schema(data)
 
-    return jsonschema.Draft202012Validator(schema)
+    result =  jsonschema.Draft202012Validator(data)
+
+    if set_default:
+        global schema
+        schema = result
+
+    return result
 
 
-def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -> Tuple[bool, Union[list, Exception]]:
+load_schema('DPCLschema.json')
+
+
+def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator = schema) -> Tuple[bool, Union[list, Exception]]:
     """
     Load and validate a JSON instance of a DPCL program.
 
@@ -43,17 +52,21 @@ def load_validate_json(filename: str, schema: jsonschema.Draft202012Validator) -
         data = json.load(data_file)
 
     schema.validate(data)
+    # if not schema.is_valid(data):
+    for error in schema.iter_errors(data):
+        print(error)
+
     return data
 
 
-if __name__ == "__main__":
-    schema = load_schema('DPCLschema.json')
-    success, data = load_validate_json(sys.argv[1], schema)
-    if success:
-        print("Validation of file passed.")
-    else:
-        print("Error while validating file:")
-        print(data)
+# if __name__ == "__main__":
+#     schema = load_schema('DPCLschema.json')
+#     success, data = load_validate_json(sys.argv[1], schema)
+#     if success:
+#         print("Validation of file passed.")
+#     else:
+#         print("Error while validating file:")
+#         print(data)
 
-    parse_result = DPCLAst.Program.from_json(data)
-    print([g.id for g in parse_result.globals])
+#     parse_result = DPCLAst.Program.from_json(data)
+#     print([g.id for g in parse_result.globals])
