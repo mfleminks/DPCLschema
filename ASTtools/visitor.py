@@ -9,8 +9,6 @@ from ASTtools.namespace import Namespace
 from builtins import NotImplementedError
 from copy import copy
 
-import ASTtools.nodes as nodes
-
 
 # Prevent recursive imports
 if TYPE_CHECKING:
