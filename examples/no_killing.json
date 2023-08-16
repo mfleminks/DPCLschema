@@ -1,0 +1,18 @@
+[
+    {"atomics": ["jeff", "killer"]},
+    {
+        "position": "power",
+        "action": "#kill",
+        "consequence": {
+            "entity": "holder",
+            "gains": true,
+            "descriptor": "killer"
+        },
+        "alias": "p_kill"
+    },
+    {
+        "position": "prohibition",
+        "action": "#kill",
+        "alias": "pr_kill"
+    }
+]

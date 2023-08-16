@@ -1,4 +1,5 @@
 from __future__ import annotations
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from ASTtools.namespace import Namespace
@@ -8,6 +9,8 @@ from ASTtools.namespace import Namespace
 from builtins import NotImplementedError
 from copy import copy
 
+import ASTtools.nodes as nodes
+
 
 # Prevent recursive imports
 if TYPE_CHECKING:
@@ -15,6 +18,8 @@ if TYPE_CHECKING:
 
 
 class GenericVisitor:
+    replace_children = True
+
     def __init__(self) -> None:
         self.running = False
         self.stack = []
@@ -51,7 +56,7 @@ class GenericVisitor:
         return result
 
     def visitChildren(self, node: nodes.Node):
-        node.visit_children(self)
+        node.visit_children(self, self.replace_children)
         return node
 
     def visitNode(self, node: nodes.Node):
@@ -130,17 +135,11 @@ class CompoundInstantiator(GenericVisitor):
     def visitCompoundFrame(self, node: nodes.CompoundFrame):
         # Ensure we don't modify nested compounds
         if node is not self.stack[0]:
-            # return self.visitGenericObject(node)
             return node
 
         result = self.constructor(self.new_name, node.body.copy())
         result.namespace = self.new_namespace
         result.body = node.body.copy()
-
-        # result = copy(node)
-
-        # result.name = self.new_name
-        # result.namespace = self.new_namespace
 
         self.namespace_mapping[node.namespace] = self.new_namespace
 
@@ -155,12 +154,10 @@ class CompoundInstantiator(GenericVisitor):
     def visitGenericObject(self, node: nodes.GenericObject):
         result = copy(node)
         result.body = node.body.copy()
-        # result.namespace = copy(result.namespace)
         result.namespace = Namespace(node.name, node.namespace.parent)
 
         self.namespace_mapping[node.namespace] = result.namespace
 
-        # result.visit_children(self)
         self.visitChildren(result)
         return result
 
@@ -169,16 +166,6 @@ class CompoundInstantiator(GenericVisitor):
 
     def visitDeonticFrame(self, node: nodes.DeonticFrame):
         return self.visitGenericObject(node)
-
-    # def visitObjectReference(self, node: nodes.ObjectReference):
-    #     # if reference points to namespace outside instantiated compound, leave it as is
-    #     node.local_namespace = self.namespace_mapping.get(node.local_namespace, node.local_namespace)
-
-    #     # if node.references_param:
-    #     #     # node.references_param = False
-    #     #     node.object = node.resolve(context=self.new_namespace)
-
-    #     return node
 
 
 class ASTLinker(GenericVisitor):
@@ -219,17 +206,8 @@ class ASTLinker(GenericVisitor):
         result = self.visitProgram(node)
         node.namespace.parent = node.owner.namespace
         return result
-        # node.owner = self.current_scope
-        # self.current_scope = node
-
-        # self.visitChildren(node)
-
-        # self.current_scope = node.owner
-
-        # return node
 
     def visitCompoundFrame(self, node: nodes.CompoundFrame):
-        # return self.visitGenericObject(node)
         # uninstantiated compounds should not be linked
         node.owner = self.current_scope
         node.parent_node = self.parent_node
@@ -241,3 +219,88 @@ class ASTLinker(GenericVisitor):
 
     def visitDeonticFrame(self, node: nodes.DeonticFrame):
         return self.visitGenericObject(node)
+
+
+class ASTPrinter(GenericVisitor):
+    replace_children = False
+
+    def __init__(self) -> None:
+        self.indent_ctr = 0
+        self.indent_symbol = "\t"
+        self.inline_ctr = 0
+
+    @contextmanager
+    def print_inline(self):
+        self.inline_ctr += 1
+        yield
+        self.inline_ctr -= 1
+
+    @property
+    def inline(self):
+        return self.inline_ctr > 0
+
+    @property
+    def indent(self):
+        return self.indent_symbol * self.indent_ctr
+
+    def print(self, line: str):
+        if self.inline:
+            print(line, end='')
+        else:
+            print(self.indent + line)
+
+    def visitNode(self, node: nodes.Node):
+        raise NotImplementedError
+
+    def plus_minus(self, active: bool):
+        return '+' if active else '-'
+
+    def visitProgram(self, node: nodes.Program):
+        # TOOD body does not contain objects created via REPL
+        for n in node.body:
+            self.visit(n)
+            self.print
+
+    def visitGenericObject(self, node: nodes.GenericObject):
+        active = self.plus_minus(node.active)
+        self.print(f"{active}{node.full_name} {[d.full_name for d in node.all_descriptors]} {{")
+        self.indent_ctr += 1
+
+        self.visitChildren(node)
+
+        self.indent_ctr -= 1
+        self.print("}")
+
+    def visitPowerFrame(self, node: nodes.PowerFrame):
+        active = self.plus_minus(node.active)
+        self.print(f"{active}power {node.full_name or ''} {{")
+        self.indent_ctr += 1
+
+        self.print(f"holder: {node.holder.name}")
+        self.print(f"action: {node.action.name}")
+
+        self.print(f"consequence: {self.visit(node.consequence)}")
+
+        self.indent_ctr -= 1
+        self.print("}")
+
+    def visitReactiveRule(self, node: nodes.ReactiveRule):
+        with self.print_inline():
+            self.print(f"{self.visit(node.event)} => {self.visit(node.reaction)}")
+
+    def visitTransformationalRule(self, node: nodes.TransformationalRule):
+        self.print(f"{self.visit(node.antecedent)} -> {self.visit(node.consequent)}")
+
+    def visitActionReference(self, node: nodes.ActionReference):
+        agent = f"{(node.agent.resolve().full_name)}." if node.agent else ''
+        self.print(f"{agent}{node.name} {{{node.args or ''}}}")
+
+    def visitProductionEventReference(self, node: nodes.ProductionEventReference):
+        self.print(self.plus_minus(node.new_state) + node.object.resolve().full_name)
+
+    def visitObjectReference(self, node: nodes.ObjectReference):
+        try:
+            self.print(node.resolve().full_name)
+        # TODO double-check the error raised by resolve
+        except ValueError:
+            self.print(node.name)

@@ -134,6 +134,7 @@ class DPCLShell(cmd.Cmd):
         self.print(ref.resolve())
 
     def do_exit(self, arg):
+        self.print("Goodbye!")
         return True
 
 

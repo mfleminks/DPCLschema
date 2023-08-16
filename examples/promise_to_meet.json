@@ -1,4 +1,5 @@
 [
+    {"atomics": ["alice", "bob"]},
     {
         "position": "power",
         "holder": "bob",

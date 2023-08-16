@@ -1,4 +1,4 @@
-load examples/library2.json
+load examples/library.json
 {
     "agent": "alice",
     "action": "#register"
@@ -13,7 +13,7 @@ show "alice"
         }
     }
 }
-show
+show {"object": "borrowing", "refinement": {"borrower": "alice", "lender": "library", "item": "dracula"}}
 {
     "agent": "alice",
     "action": {
@@ -23,5 +23,5 @@ show
         }
     }
 }
-show
+show {"object": "borrowing", "refinement": {"borrower": "alice", "lender": "library", "item": "dracula"}}
 exit

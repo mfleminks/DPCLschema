@@ -93,8 +93,6 @@ def from_json(data, *args, **kwargs) -> Node:
 
     if not constructor:
         raise ValueError(f"No applicable constructor found for {data}")
-        # print(f"No applicable constructor found for {data}")
-        # return data
 
     try:
         return constructor.from_json(data, *args, **kwargs)
@@ -110,10 +108,6 @@ class BaseDescriptor(metaclass=ABCMeta):
 
     def matches(self, other) -> bool:
         return self.has_referent(other)
-
-    # @abstractmethod
-    # def all_referents(self, object) -> list[GenericObject]:
-    #     raise NotImplementedError
 
 
 class Node:
@@ -138,7 +132,7 @@ class Node:
     def __init__(self, *args, **kwargs):
         self.aliases = []
 
-    def visit_children(self, visitor: GenericVisitor) -> None:
+    def visit_children(self, visitor: GenericVisitor, replace_children=True) -> None:
         """
         Visit each of the node's child nodes, and replace them with the return values
 
@@ -146,12 +140,16 @@ class Node:
         ----------
         visitor : GenericVisitor
             The visitor object that will visit the children
+        replace_children : bool
+            Whether `visit`'s return value should replace the original child node.
         """
         for name in self.children:
             child = getattr(self, name)
             if child is None:
                 continue
-            setattr(self, name, visitor.visit(child))
+            result = visitor.visit(child)
+            if replace_children:
+                setattr(self, name, result)
 
     def accept(self, visitor: GenericVisitor):
         """
@@ -164,16 +162,10 @@ class Node:
             the object visiting this node
         """
         return getattr(visitor, f'visit{type(self).__name__}')(self)
-        # self.visit_children(visitor)
-
-        # return self
 
     @classmethod
     def from_json(cls, data, *args, **kwargs) -> Node:
         raise NotImplementedError
-
-    # def __hash__(self) -> int:
-    #     return hash(self.internal_id)
 
 
 class Resolvable:
@@ -250,7 +242,6 @@ class BaseBoolean(Resolvable, metaclass=ABCMeta):
             When a transformational rule sets this object to active while
             the counter is negative, or vice versa, indicating a logical contradiction.
         """
-        # old_state = self.active
 
         if not transformational:
             self._imperative_active = active
@@ -265,8 +256,6 @@ class BaseBoolean(Resolvable, metaclass=ABCMeta):
 
         self._transformational_ctr += ctr_change
 
-        # if self.active != old_state:
-        #     self.on_active_change(transformational)
         self.check_active_change()
 
     @property
@@ -373,10 +362,13 @@ class Program(Node, Statement):
         wildcard_descriptor.parent_node = self
         wildcard_descriptor.owner = self
 
-    def visit_children(self, visitor: GenericVisitor):
-        for i, v in enumerate(self.body):
-            # print(f"visiting program body {i} {v}")
-            self.body[i] = visitor.visit(v)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        # for i, v in enumerate(self.body):
+        #     self.body[i] = visitor.visit(v)
+
+        result = [visitor.visit(node) for node in self.body]
+        if replace_children:
+            self.body = result
 
     def execute(self):
         for statement in self.body:
@@ -447,7 +439,6 @@ class ActionReference(EventReference):
     def __init__(self, name: str, agent: ObjectReference = None, args: dict[str, ObjectReference] = None):
         super().__init__()
 
-        # self.action = events.ActionHandler.get_event(name)
         self.name = name
         self.agent = agent
         self.args = args or {}
@@ -469,11 +460,15 @@ class ActionReference(EventReference):
         except exceptions.DPCLNameError:
             return events.ActionHandler.get_event(self.name)
 
-    def visit_children(self, visitor: GenericVisitor):
-        self.agent = visitor.visit(self.agent)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        agent = visitor.visit(self.agent)
+        if replace_children:
+            self.agent = agent
 
         for name, ref in self.args.items():
-            self.args[name] = ref.accept(visitor)
+            result = ref.accept(visitor)
+            if replace_children:
+                self.args[name] = result
 
     @classmethod
     def from_json(cls, json: dict | str):
@@ -482,7 +477,6 @@ class ActionReference(EventReference):
             json = json['action']
         else:
             agent = None
-        # action = json['action']
 
         if isinstance(json, str):
             name = json
@@ -504,7 +498,6 @@ class ActionReference(EventReference):
             result += f" {self.args}"
 
         return result
-        # return f"action: ({self.agent}).{self.name}"
 
 
 class NamingEventReference(EventReference):
@@ -803,8 +796,6 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
                 r.check_descriptor_change(descriptor)
 
     def set_descriptor(self, descriptor: BaseDescriptor, state: bool, transformational=False, positive_change=False):
-        # print(f"desciptor set: {self = }, {descriptor = }, {state = }, {transformational = }")
-
         if not state and descriptor is self:
             raise exceptions.DescriptorError(f"Cannot remove descriptor {self.full_name} from itself")
 
@@ -954,12 +945,18 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
         for statement in self.body:
             statement.execute()
 
-    def visit_children(self, visitor: GenericVisitor):
-        for i, d in enumerate(self.initial_descriptors):
-            self.initial_descriptors[i] = visitor.visit(d)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        # for i, d in enumerate(self.initial_descriptors):
+        #     self.initial_descriptors[i] = visitor.visit(d)
+        result = [visitor.visit(node) for node in self.initial_descriptors]
+        if replace_children:
+            self.initial_descriptors = result
 
-        for i, v in enumerate(self.body):
-            self.body[i] = visitor.visit(v)
+        result = [visitor.visit(node) for node in self.body]
+        if replace_children:
+            self.body = result
+        # for i, v in enumerate(self.body):
+        #     self.body[i] = visitor.visit(v)
 
     @property
     def full_name(self):
@@ -1067,7 +1064,7 @@ class BooleanNegation(BaseBoolean, Node):
 class AtomicDeclarations(Statement, Node):
     def __init__(self, names):
         super().__init__()
-        self.names = names
+        # self.names = names
 
         self.objects = [GenericObject(name, []) for name in names]
 
@@ -1078,9 +1075,12 @@ class AtomicDeclarations(Statement, Node):
         for o in self.objects:
             o.execute()
 
-    def visit_children(self, visitor: GenericVisitor):
-        for i, v in enumerate(self.objects):
-            self.objects[i] = visitor.visit(v)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        result = [visitor.visit(o) for o in self.objects]
+        if replace_children:
+            self.objects = result
+        # for i, v in enumerate(self.objects):
+        #     self.objects[i] = visitor.visit(v)
 
     @classmethod
     def from_json(cls, json, *args, **kwargs) -> AtomicDeclarations:
@@ -1258,11 +1258,15 @@ class ObjectReference(Node):
     def accept(self, visitor: GenericVisitor):
         return visitor.visitObjectReference(self)
 
-    def visit_children(self, visitor: GenericVisitor):
-        self.parent = visitor.visit(self.parent)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        parent = visitor.visit(self.parent)
+        if replace_children:
+            self.parent = parent
 
         for k, v in self.refinement.items():
-            self.refinement[k] = visitor.visit(v)
+            result = visitor.visit(v)
+            if replace_children:
+                self.refinement[k] = result
 
         return self
 
@@ -1365,20 +1369,6 @@ class PowerFrame(GenericObject):
 
         return True
 
-    def fire(self, args: dict[str, GenericObject]):
-        # NOTE deprecated
-
-        # print(f"power {self.name} called, {kwargs = }")
-        # print(self.action.args)
-        # print(f"calling {self.consequence} with {args = }")
-
-        # if args['holder'].has_descriptor(self.holder):
-        raise NotImplementedError("Power.fire is deprecated")
-        if all(s.matches(args[name], context=self.namespace) for name, s in self.selectors.items()):
-            # print("triggering consequence")
-            context = Namespace('', self.namespace, initial=args)
-            self.consequence.fire(context)
-
     def execute(self):
         self.action.resolve().add_power(self)
         return super().execute()
@@ -1406,27 +1396,21 @@ class PowerFrame(GenericObject):
 class DeonticFrame(GenericObject, EventListener, Statement):
     children = ['action', 'holder', 'counterparty',
                 '_violation', '_fulfillment', '_termination',
-                # 'violation_object', 'fulfillment_object'
                 ]
     visit_children = Node.visit_children
 
     def __init__(self, position: str, action: ActionReference,
                  holder: ObjectReference, counterparty: ObjectReference,
-                 violation: events.BaseEventHandler | BaseBoolean = None,
-                 fulfillment: events.BaseEventHandler | BaseBoolean = None,
-                 termination: events.BaseEventHandler | BaseBoolean = None,
+                 violation: EventReference | BaseBoolean = None,
+                 fulfillment: EventReference | BaseBoolean = None,
+                 termination: EventReference | BaseBoolean = None,
                  alias: str = None):
-        # self.violation_object = GenericObject('violated', active=False)
-        # self.fulfillment_object = GenericObject('fulfilled', active=False)
 
         body = [
             GenericObject('violated', active=False),
             GenericObject('fulfilled', active=False)
         ]
         super().__init__(alias, body=body)
-        # super().__init__(alias, body=[self.violation_object, self.fulfillment_object])
-        # GenericObject.__init__(self, alias)
-        # EventListener.__init__(self)
 
         self.position = position
         self.action = action
@@ -1435,10 +1419,6 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         self._violation = violation
         self._fulfillment = fulfillment
         self._termination = termination
-
-        # self.action.add_callback(self)
-        # self.violation.add_callback(self)
-        # self.fulfillment.add_callback(self)
 
     @property
     def violation_object(self):
@@ -1484,19 +1464,15 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         self.namespace.add('counterparty', self.counterparty, auto_id=False)
 
     def notify(self, **kwargs):
-        print(f"deontic frame {self} notified of event {kwargs}")
 
         if self.position == 'duty':
             self.fulfillment_object.set_active(True, transformational=False)
         elif self.position == 'prohibition':
             self.violation_object.set_active(True, transformational=False)
-            print("set violation to True")
-            print(self.violation_object.owner is self)
-            print(self.violation_object.owner.active, self.violation_object._imperative_active)
 
-    def visit_children(self, visitor: GenericVisitor):
-        Node.visit_children(self, visitor)
-        super().visit_children(visitor)
+    def visit_children(self, visitor: GenericVisitor, replace_children=True):
+        Node.visit_children(self, visitor, replace_children)
+        super().visit_children(visitor, replace_children)
 
     @property
     def prefix(self):
@@ -1532,12 +1508,10 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         return visitor.visitDeonticFrame(self)
 
     def __repr__(self) -> str:
-        # return super().__repr__() + f"({self.position}{', violated'*self.violation_object.active}{', fulfilled'*self.fulfillment_object.active})"
         result = '+' if self.active else '-'
         result += f"{self.position}:"
         if self.name:
             result += self.name
-        # result += f"({', violated'*self.violation_object.active}{', fulfilled'*self.fulfillment_object.active})"
         result += f"(', violated':{self.violation_object.active}', fulfilled':{self.fulfillment_object.active})"
         return result
 
@@ -1595,19 +1569,6 @@ class CompoundFrame(GenericObject):
             statement.execute()
 
         return result
-
-        # copy = visitor.CompoundInstantiator().run(self, full_name, new_namespace)
-
-        # # copy = visitor.ASTCopier().visit(self)
-        # result = GenericObject(full_name, copy.body)
-        # result.namespace = Namespace(full_name, self.namespace, args)
-        # # result.namespace.parent = self.namespace
-
-
-        # # Bypass triggering any events
-        # result.add_descriptor(self)
-
-        # return result
 
     def args_to_key(self, args: dict[str, GenericObject]) -> tuple:
         """
@@ -1727,7 +1688,7 @@ class ReactiveRule(Node, EventListener, Statement):
         self.reaction.fire(**kwargs)
 
     def execute(self) -> None:
-        return self.event.add_observer(self)
+        self.event.add_observer(self)
 
     @classmethod
     def from_json(cls, json: dict):

@@ -1,39 +1,65 @@
 [
+    { "atomics": ["member", "fine", "student", "alice", "book", "dracula", "library"] },
+    {
+        "entity": "alice",
+        "gains": true,
+        "descriptor": "student"
+    },
+    {
+        "entity": "dracula",
+        "gains": true,
+        "descriptor": "book"
+    },
     {
         "position": "power",
         "holder": "student",
         "action": "#register",
         "consequence": {
             "entity": "holder",
-            "in": "member"
+            "gains": true,
+            "descriptor": "member"
         },
         "alias": "register"
     },
     {
         "position": "power",
+        "alias": "borrow",
         "holder": "member",
         "action": {
-            "reference": "#borrow",
+            "event": "#borrow",
             "refinement": {
                 "item": "book"
             }
         },
         "consequence": {
             "plus": {
-                "reference": "borrowing",
+                "object": "borrowing",
                 "refinement": {
                     "lender": "library",
                     "borrower": "holder",
                     "item": "item"
                 }
             }
-        },
-        "alias": "borrow"
+        }
     },
     {
-        "compound": "borrow",
+        "object": "borrowing",
         "params": ["lender", "borrower", "item"],
         "content": [
+            {
+                "position": "power",
+                "alias": "return",
+                "holder": "borrower",
+                "action": {
+                    "event": "#return",
+                    "refinement": {
+                        "item": "item"
+                    }
+                },
+                "consequence": {
+                    "minus": "super"
+                }
+            },
             {
                 "position": "power",
                 "holder": "lender",
@@ -44,7 +70,7 @@
                         "holder": "borrower",
                         "counterparty": "lender",
                         "action": {
-                            "reference": "#return",
+                            "event": "#return",
                             "refinement": {
                                 "item": "item"
                             }
@@ -52,12 +78,13 @@
                     }
                 },
                 "alias": "register"
-            }, {
+            },
+            {
                 "position": "duty",
                 "holder": "borrower",
                 "counterparty": "lender",
                 "action": {
-                    "reference": "#return",
+                    "event": "#return",
                     "refinement": {
                         "item": "item"
                     }
@@ -68,14 +95,14 @@
                 "event": {
                     "plus": {
                         "scope": "d1",
-                        "name": "violation"
+                        "name": "violated"
                     }
                 },
                 "reaction": {
                     "plus": {
                         "position": "power",
                         "holder": "lender",
-                        "action": "fine",
+                        "action": "#fine",
                         "consequence": {
                             "plus": "fine"
                         }
@@ -83,41 +110,5 @@
                 }
             }
         ]
-    },
-    {
-        "compound": "member",
-        "content": []
-    },
-    {
-        "compound": "fine",
-        "content": []
-    },
-    {
-        "compound": "student",
-        "content": []
-    },
-    {
-        "compound": "alice",
-        "content": []
-    },
-    {
-        "compound": "book",
-        "content": []
-    },
-    {
-        "compound": "dracula",
-        "content": []
-    },
-    {
-        "reaction": {
-            "entity": "alice",
-            "in": "student"
-        }
-    },
-    {
-        "reaction": {
-            "entity": "dracula",
-            "in": "book"
-        }
     }
 ]
