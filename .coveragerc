@@ -2,6 +2,7 @@
 omit =
     tests/*
     DPCLtest.py
+    REPL/pretty_print.py
 
 [report]
 skip_empty = True

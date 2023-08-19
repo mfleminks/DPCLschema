@@ -1,4 +1,5 @@
 import pytest
+from ASTtools import exceptions
 import ASTtools.nodes as nodes
 
 
@@ -245,3 +246,33 @@ class TestGenericObject:
             assert node.body == []
             assert node.params == params
             assert not node._imperative_active
+
+
+@pytest.mark.parametrize('val', [True, False])
+def test_boolean_literal(val):
+    node: nodes.BooleanLiteral = nodes.from_json(val)
+
+    assert isinstance(node, nodes.BooleanLiteral)
+    assert node.active == val
+
+    # Modify declarative
+    with pytest.raises(exceptions.DPCLTypeError):
+        node.set_active(not val, False)
+
+    # Modify imperative
+    with pytest.raises(exceptions.DPCLTypeError):
+        node.set_active(not val, True)
+
+
+class TestTransformationalRule:
+    conditions = [('foo', nodes.ObjectReference), ({'entity': 'foo', 'has': True, 'descriptor': 'bar'}, nodes.DescriptorCondition)]
+
+    @pytest.mark.parametrize('condition,condition_type', conditions)
+    @pytest.mark.parametrize('conclusion,conclusion_type', conditions)
+    def test_transformational_rule(self, condition, condition_type, conclusion, conclusion_type):
+        data = {'condition': condition, 'conclusion': conclusion}
+        node: nodes.TransformationalRule = nodes.from_json(data)
+
+        assert isinstance(node, nodes.TransformationalRule)
+        assert isinstance(node.antecedent, condition_type)
+        assert isinstance(node.consequent, conclusion_type)

@@ -1,5 +1,5 @@
 [
-    { "atomics": ["member", "fine", "student", "alice", "book", "dracula", "library"] },
+    { "atomics": ["member", "fined", "student", "alice", "book", "dracula", "library"] },
     {
         "entity": "alice",
         "gains": true,
@@ -57,13 +57,13 @@
                     }
                 },
                 "consequence": {
-                    "minus": "super"
+                    "minus": "self"
                 }
             },
             {
                 "position": "power",
                 "holder": "lender",
-                "action": "#request_return",
+                "action": {"event": "#request_return", "refinement": {"item": "item"}},
                 "consequence": {
                     "plus": {
                         "position": "duty",
@@ -74,10 +74,11 @@
                             "refinement": {
                                 "item": "item"
                             }
-                        }
+                        },
+                        "violation":"#early_timeout"
                     }
                 },
-                "alias": "register"
+                "alias": "req_return"
             },
             {
                 "position": "duty",
@@ -89,7 +90,8 @@
                         "item": "item"
                     }
                 },
-                "alias": "d1"
+                "alias": "d1",
+                "violation": "#timeout"
             },
             {
                 "event": {
@@ -102,9 +104,17 @@
                     "plus": {
                         "position": "power",
                         "holder": "lender",
-                        "action": "#fine",
+                        "action": {
+                            "event": "#fine",
+                            "refinement": {
+                                "target": "borrower"
+                            }
+
+                        },
                         "consequence": {
-                            "plus": "fine"
+                            "entity": "borrower",
+                            "gains": true,
+                            "descriptor": "fined"
                         }
                     }
                 }

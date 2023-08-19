@@ -102,6 +102,10 @@ def from_json(data, *args, **kwargs) -> Node:
 
 
 class BaseDescriptor(metaclass=ABCMeta):
+    def __init__(self, *args, **kwargs) -> None:
+        # Support use as mixin
+        super(BaseDescriptor, self).__init__(*args, **kwargs)
+
     @abstractmethod
     def has_referent(self, object) -> bool:
         raise NotImplementedError
@@ -125,11 +129,13 @@ class Node:
     """
     children: list[str] = []
 
-    owner: Program | GenericObject
-    parent_node: Node
+    _owner: Program | GenericObject = None
+    parent_node: Node = None
+
     prefix = 'undefined_node'
 
     def __init__(self, *args, **kwargs):
+        self.owned_nodes: list[Node] = []
         self.aliases = []
 
     def visit_children(self, visitor: GenericVisitor, replace_children=True) -> None:
@@ -150,6 +156,24 @@ class Node:
             result = visitor.visit(child)
             if replace_children:
                 setattr(self, name, result)
+
+    @property
+    def owner(self):
+        return self._owner
+
+    @owner.setter
+    def owner(self, node: Node):
+        node.owned_nodes.append(self)
+        self._owner = node
+
+    def on_owner_active_change(self, owner_active: bool):
+        """
+        Function to be called when a node's owner is activated or deactived.
+
+        Does nothing for most nodes, but transformational rules need to know
+        immediately when they change state
+        """
+        pass
 
     def accept(self, visitor: GenericVisitor):
         """
@@ -200,7 +224,7 @@ class BaseBoolean(Resolvable, metaclass=ABCMeta):
     """
     def __init__(self, active: bool, *args, **kwargs) -> None:
         # For use as mixin
-        super().__init__(active=active, *args, **kwargs)
+        super(BaseBoolean, self).__init__(active=active, *args, **kwargs)
         self._imperative_active = active
         self._transformational_ctr = 0
         self._observers = set()
@@ -280,13 +304,19 @@ class BaseBoolean(Resolvable, metaclass=ABCMeta):
         self._observers.remove(observer)
 
     def on_active_change(self, transformational: bool):
+        # print(f"on active change: {self.name = }, {self._observers = }, {self.get_bool_event(self.active).callbacks = }")
+
         self.notify_boolean_observers()
 
+        # TODO this check is probably outdated
         # Don't fire event if this change was caused by event
-        if transformational:
-            self.get_bool_event(self.active).fire()
+        # if transformational:
+        #     self.get_bool_event(self.active).fire()
+        self.get_bool_event(self.active).fire()
 
     def check_active_change(self):
+
+        # print(f"check active change: {self.name = }, {self.prev_active = }")
         if self.prev_active != self.active:
             self.on_active_change(False)
 
@@ -332,14 +362,19 @@ class Statement(metaclass=ABCMeta):
         super(Statement, self).__init__(*args, **kwargs)
 
     @abstractmethod
-    def execute(self) -> None:
+    def execute(self) -> bool:
         """
         Execute the statement.
+
+        Returns
+        -------
+        bool:
+            Whether the statement should remain in the owner's body after execution.
         """
         raise NotImplementedError
 
 
-class Program(Node, Statement):
+class Program(Statement, Node):
     # TODO docstring
     # TODO maybe make subclass of GenericObject
 
@@ -371,8 +406,11 @@ class Program(Node, Statement):
             self.body = result
 
     def execute(self):
-        for statement in self.body:
-            statement.execute()
+        self.body = [s for s in self.body if s.execute()]
+        # for statement in self.body:
+        #     statement.execute()
+
+        return True
 
     def get_variable(self, name: str) -> GenericObject:
         """
@@ -405,6 +443,7 @@ class Program(Node, Statement):
 
     @property
     def full_name(self):
+        return 'Program'
         return f"<{self.name}>"
 
 
@@ -422,6 +461,7 @@ class EventReference(Node, Statement, Resolvable):
 
     def execute(self):
         self.fire()
+        return False
 
 
 class ActionReference(EventReference):
@@ -489,15 +529,15 @@ class ActionReference(EventReference):
 
         return ActionReference(name, agent, refinement)
 
-    def __repr__(self) -> str:
-        result = "ActionRef:"
-        if self.agent:
-            result += f"{self.agent}."
-        result += self.name
-        if self.args:
-            result += f" {self.args}"
+    # def __repr__(self) -> str:
+    #     result = "ActionRef:"
+    #     if self.agent:
+    #         result += f"{self.agent}."
+    #     result += self.name
+    #     if self.args:
+    #         result += f" {self.args}"
 
-        return result
+    #     return result
 
 
 class NamingEventReference(EventReference):
@@ -535,9 +575,9 @@ class NamingEventReference(EventReference):
 
         return cls(entity, descriptor, new_state)
 
-    def __repr__(self) -> str:
-        operator = "gains" if self.new_state else "loses"
-        return f"NERef:( {self.object} {operator} {self.descriptor} )"
+    # def __repr__(self) -> str:
+    #     operator = "gains" if self.new_state else "loses"
+    #     return f"NERef:( {self.object} {operator} {self.descriptor} )"
 
 
 class ProductionEventReference(EventReference):
@@ -567,7 +607,7 @@ class ProductionEventReference(EventReference):
             object = json['minus']
             new_state = False
 
-        object = from_json(object)
+        object = from_json(object, active=not new_state)
 
         return cls(object, new_state)
 
@@ -691,9 +731,11 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
     def on_active_change(self, transformational: bool):
         super().on_active_change(transformational)
 
-        for obj in self.body:
-            if not isinstance(obj, BaseBoolean): continue
-            obj.check_active_change()
+        # for obj in self.body:
+        #     if not isinstance(obj, BaseBoolean): continue
+        #     obj.check_active_change()
+        for node in self.owned_nodes:
+            node.on_owner_active_change(self.active)
 
     # Funtions Dealing with descriptors
 
@@ -870,7 +912,8 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
         """
         if referent is self:
             return True
-        return referent in self.referents
+        # return referent in self.referents
+        return any(r.has_referent(referent) for r in self.referents)
 
     def add_initial_descriptors(self) -> None:
         """
@@ -929,6 +972,9 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
 
     # Misc.
 
+    def on_owner_active_change(self, owner_active):
+        self.check_active_change()
+
     def accept(self, visitor: GenericVisitor):
         return visitor.visitGenericObject(self)
 
@@ -944,6 +990,8 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
 
         for statement in self.body:
             statement.execute()
+
+        return True
 
     def visit_children(self, visitor: GenericVisitor, replace_children=True):
         # for i, d in enumerate(self.initial_descriptors):
@@ -967,19 +1015,19 @@ class GenericObject(BaseDescriptor, Statement, BaseBoolean, Resolvable, Node):
             return self.name
 
     @classmethod
-    def from_json(cls, json: dict):
+    def from_json(cls, json: dict, active=True):
         name = json['object']
         content = [from_json(c) for c in json['content']]
 
         descriptors = [from_json(d) for d in json.get('initial_descriptors', [])]
 
-        return GenericObject(name, content, descriptors=descriptors)
+        return GenericObject(name, content, active=active, descriptors=descriptors)
 
     def __repr__(self) -> str:
         return f"{'+' if self.active else '-'}{self.__class__.__name__}:{self.name}[{', '.join(d.name for d in list(self.descriptors))}]"
 
 
-class DescriptorCondition(BaseBoolean, Node):
+class DescriptorCondition(BaseBoolean, EventListener, Node):
     children = ['object', 'descriptor']
 
     def __init__(self, object: ObjectReference, descriptor: ObjectReference, _in: bool) -> None:
@@ -992,10 +1040,24 @@ class DescriptorCondition(BaseBoolean, Node):
         self.descriptor = descriptor
         self._in  = _in
 
+        # super().__init__(active=None)
+
     def set_active(self, active: bool, transformational: bool, positive_change: bool = False) -> None:
         super().set_active(active, transformational, positive_change)
         self.object.resolve().check_descriptor_change(self.descriptor.resolve())
         # pass
+
+    def add_boolean_observer(self, observer: TransformationalRule):
+        super().add_boolean_observer(observer)
+
+        obj = self.object.resolve()
+        desc = self.descriptor.resolve()
+
+        events.NamingEventHandler.get_event(obj, desc, self._in).add_callback(self)
+        events.NamingEventHandler.get_event(obj, desc, not self._in).add_callback(self)
+
+    def notify(self, **kwargs):
+        return self.notify_boolean_observers()
 
     @property
     def _imperative_active(self):
@@ -1075,6 +1137,8 @@ class AtomicDeclarations(Statement, Node):
         for o in self.objects:
             o.execute()
 
+        return True
+
     def visit_children(self, visitor: GenericVisitor, replace_children=True):
         result = [visitor.visit(o) for o in self.objects]
         if replace_children:
@@ -1092,10 +1156,17 @@ class BooleanLiteral(BaseBoolean, Node):
     active: bool
 
     def __init__(self, active: bool) -> None:
-        self.active = active
+        self._active = active
+
+    @property
+    def active(self):
+        return self._active
 
     def get_bool_event(self, state) -> events.DummyEventHandler:
         return events.DummyEventHandler()
+
+    def set_active(self, active: bool, transformational: bool, positive_change: bool = False) -> None:
+        raise exceptions.DPCLTypeError(f"Cannot assign value to boolean literal {self.active}")
 
 
 class Import(Node, Statement):
@@ -1123,6 +1194,8 @@ class Import(Node, Statement):
 
         for statement in self.obj.body:
             statement.execute()
+
+        return True
         # self.obj.execute()
 
 
@@ -1223,8 +1296,8 @@ class ObjectReference(Node):
         if self.object:
             return self.object
         # TODO this does not work with nested compounds
-        if self.references_param:
-            return context.get(self.name, recursive=False)
+        # if self.references_param:
+        #     return context.get(self.name, recursive=False)
 
         namespace = (context or self.owner.namespace)
 
@@ -1232,7 +1305,8 @@ class ObjectReference(Node):
             raise ValueError("ObjectReference has neither parent reference nor namespace")
 
         if self.parent:
-            result = self.parent.resolve(context=context).namespace.get(self.name, recursive=False)
+            # result = self.parent.resolve(context=context).namespace.get(self.name, recursive=False)
+            result = self.parent.resolve(context=context).get_attribute(self.name)
 
             if isinstance(result, Parameter):
                 raise ValueError("Cannot reference parameter as attribute")
@@ -1248,10 +1322,6 @@ class ObjectReference(Node):
 
         if self.refinement:
             result = result.get_instance({k: v.resolve(context=namespace) for k, v in self.refinement.items()})
-
-        # TODO move check for selector elsewhere
-        if save and not isinstance(result, Selector):
-            self.object = result
 
         return result
 
@@ -1271,23 +1341,23 @@ class ObjectReference(Node):
         return self
 
     @classmethod
-    def from_json(cls, arg):
+    def from_json(cls, JSON, *args, **kwargs):
         # Atomic object
-        if isinstance(arg, str):
-            return ObjectReference(name=arg)
+        if isinstance(JSON, str):
+            return ObjectReference(name=JSON)
 
-        if 'scope' in arg:
-            parent = from_json(arg['scope'])
-            arg = arg['name']
+        if 'scope' in JSON:
+            parent = from_json(JSON['scope'])
+            JSON = JSON['name']
         else:
             parent = None
 
-        if isinstance(arg, str):
-            return ObjectReference(arg, parent=parent)
+        if isinstance(JSON, str):
+            return ObjectReference(JSON, parent=parent)
 
-        refinement = {k: from_json(v) for k, v in arg['refinement'].items()}
+        refinement = {k: from_json(v) for k, v in JSON['refinement'].items()}
 
-        return ObjectReference(arg['object'], refinement, parent=parent)
+        return ObjectReference(JSON['object'], refinement, parent=parent)
 
     def __repr__(self) -> str:
         result = "ObjRef:"
@@ -1306,8 +1376,8 @@ class PowerFrame(GenericObject):
     visit_children = Node.visit_children
     prefix = "Power"
 
-    def __init__(self, position: str, action: ActionReference, consequence: EventReference, holder: ObjectReference, alias=None):
-        super().__init__(alias)
+    def __init__(self, position: str, action: ActionReference, consequence: EventReference, holder: ObjectReference, alias=None, active=True):
+        super().__init__(alias, active=active)
 
         self.position = position
         self.action = action
@@ -1355,10 +1425,6 @@ class PowerFrame(GenericObject):
             s = s.resolve(context=context)
             if arg is None:
                 return False
-            # if isinstance(arg, GenericObject) and arg.has_descriptor(s):
-            #     continue
-            # # arg is an ActionHandler
-            # s: events.ActionHandler
             if s.matches(arg):
                 continue
 
@@ -1371,10 +1437,11 @@ class PowerFrame(GenericObject):
 
     def execute(self):
         self.action.resolve().add_power(self)
+        # TODO shouldn't this be its own logic?
         return super().execute()
 
     @classmethod
-    def from_json(cls, arg: dict) -> PowerFrame:
+    def from_json(cls, arg: dict, active=True) -> PowerFrame:
         position = arg['position']
         alias = arg.get('alias')
 
@@ -1387,7 +1454,7 @@ class PowerFrame(GenericObject):
         # elif 'in' in consequence or 'out' in consequence:
         #     consequence = NamingEventReference.from_json(consequence)
 
-        return cls(position, action, consequence, holder, alias)
+        return PowerFrame(position, action, consequence, holder, alias, active=active)
 
     def accept(self, visitor: GenericVisitor):
         return visitor.visitPowerFrame(self)
@@ -1396,6 +1463,8 @@ class PowerFrame(GenericObject):
 class DeonticFrame(GenericObject, EventListener, Statement):
     children = ['action', 'holder', 'counterparty',
                 '_violation', '_fulfillment', '_termination',
+                # 'violation_object', 'fulfillment_object',
+                # 'violation_rule', 'fulfillment_rule', 'termination_rule'
                 ]
     visit_children = Node.visit_children
 
@@ -1404,13 +1473,19 @@ class DeonticFrame(GenericObject, EventListener, Statement):
                  violation: EventReference | BaseBoolean = None,
                  fulfillment: EventReference | BaseBoolean = None,
                  termination: EventReference | BaseBoolean = None,
-                 alias: str = None):
+                 alias: str = None,
+                 active=True):
+
+        # self.violation_object = GenericObject('violated', active=False)
+        # self.fulfillment_object = GenericObject('fulfilled', active=False)
 
         body = [
             GenericObject('violated', active=False),
             GenericObject('fulfilled', active=False)
+            # self.violation_object,
+            # self.fulfillment_object
         ]
-        super().__init__(alias, body=body)
+        super().__init__(alias, body=body, active=active)
 
         self.position = position
         self.action = action
@@ -1420,48 +1495,97 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         self._fulfillment = fulfillment
         self._termination = termination
 
+        self.create_internal_rules()
+
+    def visit_children(self, visitor: GenericVisitor):
+        Node.visit_children(self, visitor)
+        GenericObject.visit_children(self, visitor)
+
     @property
-    def violation_object(self):
+    def violation_object(self) -> GenericObject:
         return self.body[0]
 
     @property
-    def fulfillment_object(self):
+    def fulfillment_object(self) -> GenericObject:
         return self.body[1]
 
+    def create_internal_rule(self, condition, internal_object, event):
+        if condition is None:
+            return
+
+        if isinstance(condition, BaseBoolean):
+            rule = TransformationalRule(condition, internal_object)
+        elif isinstance(condition, EventReference):
+            rule = ReactiveRule(condition, event)
+
+        # return rule
+
+        self.body.append(rule)
+        # visitor.ASTLinker(self, self).run(rule)
+
+        # rule.owner = self
+        # rule.parent_node = self
+
     def create_internal_rules(self):
-        # Create appropriate rule for violation
-        if isinstance(self._violation, BaseBoolean):
-            self.body.append(TransformationalRule(self._violation, self.violation_object))
-        elif isinstance(self._violation, EventReference):
-            self.body.append(ReactiveRule(self._violation, self.violation_object.get_bool_event(True)))
-        self.body[-1].owner = self
-        self.body[-1].parent_node = self
+        # # Create appropriate rule for violation
+        # if isinstance(self._violation, BaseBoolean):
+        #     self.body.append(TransformationalRule(self._violation, self.violation_object))
+        # elif isinstance(self._violation, EventReference):
+        #     self.body.append(ReactiveRule(self._violation, ProductionEventReference(self.violation_object, True)))
+        # self.body[-1].owner = self
+        # self.body[-1].parent_node = self
 
-        # Create appropriate rule for fulfillment
-        if isinstance(self._fulfillment, BaseBoolean):
-            self.body.append(TransformationalRule(self._fulfillment, self.fulfillment_object))
-        elif isinstance(self._fulfillment, EventReference):
-            self.body.append(ReactiveRule(self._fulfillment, self.fulfillment_object.get_bool_event(True)))
-        self.body[-1].owner = self
-        self.body[-1].parent_node = self
+        # # Create appropriate rule for fulfillment
+        # if isinstance(self._fulfillment, BaseBoolean):
+        #     self.body.append(TransformationalRule(self._fulfillment, self.fulfillment_object))
+        # elif isinstance(self._fulfillment, EventReference):
+        #     self.body.append(ReactiveRule(self._fulfillment, ProductionEventReference(self.fulfillment_object, True)))
+        # self.body[-1].owner = self
+        # self.body[-1].parent_node = self
 
-         # Create appropriate rule for termination
-        if isinstance(self._termination, BaseBoolean):
-            self.body.append(TransformationalRule(self._termination, BooleanNegation(self)))
-        elif isinstance(self._termination, EventReference):
-            self.body.append(ReactiveRule(self._termination, self.get_production_event(False)))
-        self.body[-1].owner = self
-        self.body[-1].parent_node = self
+        #  # Create appropriate rule for termination
+        # if isinstance(self._termination, BaseBoolean):
+        #     self.body.append(TransformationalRule(self._termination, BooleanNegation(self)))
+        # elif isinstance(self._termination, EventReference):
+        #     self.body.append(ReactiveRule(self._termination, ProductionEventReference(self, False)))
+        # self.body[-1].owner = self
+        # self.body[-1].parent_node = self
+
+        violation_ref = ObjectReference('violated')
+        fulfillment_ref = ObjectReference('fulfilled')
+        self_ref = ObjectReference('self')
+
+        self.violation_rule = self.create_internal_rule(self._violation, violation_ref, ProductionEventReference(violation_ref, True))
+        self.fulfillment_rule = self.create_internal_rule(self._fulfillment, fulfillment_ref, ProductionEventReference(fulfillment_ref, True))
+        self.termination_rule = self.create_internal_rule(self._termination, BooleanNegation(self_ref), ProductionEventReference(self_ref, False))
+        # self.create_internal_rule(self._violation, self.violation_object, ProductionEventReference(self.violation_object, True))
+        # self.create_internal_rule(self._fulfillment, self.fulfillment_object, ProductionEventReference(self.fulfillment_object, True))
+        # self.create_internal_rule(self._termination, BooleanNegation(self), ProductionEventReference(self, False))
 
     def execute(self):
-        self.create_internal_rules()
+        # self.create_internal_rules()
 
-        super().execute()
 
         self.action.add_observer(self)
 
         self.namespace.add('holder', self.holder, auto_id=False)
         self.namespace.add('counterparty', self.counterparty, auto_id=False)
+
+        # self.namespace.add('violated', self.violation_object)
+        # self.namespace.add('fulfilled', self.fulfillment_object)
+        # self.violation_object.execute()
+        # self.fulfillment_object.execute()
+
+        # if self.violation_rule:
+        #     self.violation_rule.execute()
+        # if self.fulfillment_rule:
+        #     self.fulfillment_rule.execute()
+        # if self.termination_rule:
+        #     self.termination_rule.execute()
+
+        super().execute()
+
+        return True
 
     def notify(self, **kwargs):
 
@@ -1479,7 +1603,7 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         return self.position
 
     @classmethod
-    def from_json(cls, JSON: dict):
+    def from_json(cls, JSON: dict, active=True):
         position = JSON['position']
         action = from_json(JSON['action'])
 
@@ -1502,7 +1626,7 @@ class DeonticFrame(GenericObject, EventListener, Statement):
 
         alias = JSON.get('alias')
 
-        return DeonticFrame(position, action, holder, counterparty, violation, fulfillment, termination, alias)
+        return DeonticFrame(position, action, holder, counterparty, violation, fulfillment, termination, alias, active=active)
 
     def accept(self, visitor: GenericVisitor):
         return visitor.visitDeonticFrame(self)
@@ -1558,7 +1682,7 @@ class CompoundFrame(GenericObject):
         """
         Create a new instance of this compound
         """
-        full_name = f'{self.name}{self.args_to_key(args)}'
+        full_name = f'{self.name}({", ".join(arg.name for arg in self.args_to_key(args))})'
         new_namespace = Namespace(full_name, self.namespace.parent, args)
 
         result = visitor.CompoundInstantiator().run(self, full_name, new_namespace)
@@ -1583,7 +1707,6 @@ class CompoundFrame(GenericObject):
         Parameters
         ----------
         args : dict[str, GenericObject]
-
         """
         key = self.args_to_key(args)
         if key in self.instances:
@@ -1597,6 +1720,8 @@ class CompoundFrame(GenericObject):
         self.owner.namespace.add(self.name, self)
 
         self.add_initial_descriptors()
+
+        return True
 
     def accept(self, visitor: GenericVisitor):
         return visitor.visitCompoundFrame(self)
@@ -1635,35 +1760,58 @@ class TransformationalRule(Node, Statement):
         super().__init__()
 
         # self.antecedent = antecedent if isinstance(antecedent, NamingEvent) else antecedent.
-        match antecedent:
-            case GenericObject():
-                antecedent.get_production_event
-            case events.NamingEventHandler():
-                antecedent.add_callback(self)
+        # match antecedent:
+        #     case GenericObject():
+        #         antecedent.get_production_event
+        #     case events.NamingEventHandler():
+        #         antecedent.add_callback(self)
         self.consequent = consequent
         self.antecedent = antecedent
 
-        self.alias = alias
+        self.name = alias
+
+    @property
+    def active(self) -> bool:
+        return self.owner.active
 
     def notify(self):
+        if not self.active:
+            return
+
         self.consequent.resolve().set_active(self.antecedent.resolve().active,
-                                   transformational=True,
-                                   positive_change=self.antecedent.resolve().active)
+                                             transformational=True,
+                                             positive_change=self.antecedent.resolve().active)
 
     def execute(self):
+        # Initiate object defined within rule
+        if isinstance(self.consequent, GenericObject) and not isinstance(self.owner, DeonticFrame):
+            self.consequent.execute()
+
+        self.owner.namespace.add(self.name, self)
+
         if self.antecedent.resolve().active:
             self.notify()
 
         self.antecedent.resolve().add_boolean_observer(self)
 
+        return True
+
+    def on_owner_active_change(self, owner_active: bool):
+        if not self.antecedent.resolve().active:
+            return
+
+        self.consequent.resolve().set_active(self.active,
+                                             transformational=True,
+                                             positive_change=self.active)
+
     @classmethod
-    def from_json(cls, arg):
-        condition = from_json(arg['condition'])
-        conclusion = from_json(arg['conclusion'])
+    def from_json(cls, data: dict):
+        condition = from_json(data['condition'])
+        conclusion = from_json(data['conclusion'])
 
-        alias = arg.get('alias')
+        alias = data.get('alias')
 
-        return ReactiveRule(condition, conclusion, alias)
+        return TransformationalRule(condition, conclusion, alias)
 
     # @property
     # def children(self):
@@ -1679,19 +1827,35 @@ class ReactiveRule(Node, EventListener, Statement):
         self.event = event
         self.reaction = reaction
 
-        self.alias = alias
+        self.name = alias
 
         # TODO move this to after resolving references
         # self.event.add_callback(self)
 
+    @property
+    def active(self) -> bool:
+        return self.owner.active
+
     def notify(self, **kwargs):
-        self.reaction.fire(**kwargs)
+        if self.active:
+            self.reaction.fire(**kwargs)
 
     def execute(self) -> None:
+        # Initialize object defined within rule
+        if (isinstance(self.reaction, ProductionEventReference) and
+            isinstance(self.reaction.object, GenericObject) and
+            not isinstance(self.owner, DeonticFrame)):
+            self.reaction.object.execute()
+
+        self.owner.namespace.add(self.name, self)
+
         self.event.add_observer(self)
+
+        return True
 
     @classmethod
     def from_json(cls, json: dict):
+
         reaction = from_json(json['reaction'])
 
         event = json.get('event')

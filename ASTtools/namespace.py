@@ -65,21 +65,21 @@ class Namespace:
 
         raise exceptions.DPCLNameError((f"can't resolve reference '{name}' in namespace {self.full_name}"))
 
-    def as_list(self):
-        return list(self.__symbol_table.items())
+    # def as_list(self):
+    #     return list(self.__symbol_table.items())
 
-    def print(self):
-        for name, value in self.__symbol_table.items():
-            # skip auto-IDs
-            if name.startswith('_'):
-                continue
+    # def print(self):
+    #     for name, value in self.__symbol_table.items():
+    #         # skip auto-IDs
+    #         if name.startswith('_'):
+    #             continue
 
-            print(f"{name}: {value}")
-            # Print a compound's instances
-            try:
-                value.print_instances()
-            except AttributeError:
-                pass
+    #         print(f"{name}: {value}")
+    #         # Print a compound's instances
+    #         try:
+    #             value.print_instances()
+    #         except AttributeError:
+    #             pass
 
     def add(self, name: str, value: nodes.Node, auto_id=True, overwrite=False):
         """

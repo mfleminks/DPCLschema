@@ -20,7 +20,7 @@ class BaseEventHandler(metaclass=ABCMeta):
         super().__init__()
 
         # self.callbacks = {}
-        self.callbacks = set()
+        self.callbacks: set[nodes.EventListener] = set()
 
     def add_callback(self, callback: nodes.EventListener):
         # self.callbacks.append(callback)
@@ -130,7 +130,7 @@ class ActionHandler(BaseEventHandler):
         _bypass_powers : bool, default False
             Debug option: if set to True, notify all callbacks regardless of powers
         """
-        if not (any(p.notify(action_args=kwargs) for p in self.powers) or _bypass_powers):
+        if 'holder' in kwargs and not (any(p.notify(action_args=kwargs) for p in self.powers) or _bypass_powers):
             print(f"Action {self.name} not enabled by any powers")
             # print(self.powers)
             # print(kwargs)

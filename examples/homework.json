@@ -1,0 +1,70 @@
+[
+    {"atomics": ["due", "done"]},
+    {
+        "object": "homework",
+        "params": ["student"],
+        "content": []
+    },
+    {
+        "object": "person",
+        "content": [
+            {"atomics": ["parent"]}
+        ]
+    },
+    {
+        "object": "child",
+        "content": [
+            {"atomics": ["homework"]}
+        ],
+        "initial_descriptors": ["person"]
+    },
+    {
+        "object": "charlie",
+        "content": [],
+        "initial_descriptors": ["child"]
+    },
+    {
+        "object": "alice",
+        "content": [],
+        "initial_descriptors": ["person", {"scope": "charlie", "name": "parent"}]
+    },
+    {
+        "object": "bob",
+        "content": [],
+        "initial_descriptors": ["person", {"scope": "charlie", "name": "parent"}]
+    },
+    {
+        "position": "power",
+        "holder": "child",
+        "action": {"event": "#ask_help", "refinement": {
+            "parent": {"scope": "holder", "name": "parent"},
+            "homework": {"scope": "charlie", "name": "homework"}
+        }},
+        "consequence": {"plus": {"object": "asked_for_help", "refinement": {"child": "holder", "parent": "parent", "homework": "homework"}}}
+    },
+    {
+        "position": "power",
+        "holder": {"scope": "child", "name": "parent"},
+        "action": {"event": "#help", "refinement": {"child": "child", "homework": {"scope": "charlie", "name": "homework"}}},
+        "consequence": {"entity": "homework", "gains": true, "descriptor": "done"}
+    },
+    {
+        "object": "asked_for_help",
+        "params": ["child", "parent", "homework"],
+        "content": [
+            {
+                "position": "duty",
+                "holder": "parent",
+                "counterparty": "child",
+                "action": {"event": "#help", "refinement": {"child": "child", "homework": "homework"}},
+                "violation": {"entity": "homework", "has": true, "descriptor": "due"},
+                "termination": {"plus": {"scope": "self", "name": "fulfilled"}}
+            }
+        ]
+    },
+    {
+        "object": "math_homework",
+        "content": [],
+        "initial_descriptors": [{"scope": "charlie", "name": "homework"}]
+    }
+]

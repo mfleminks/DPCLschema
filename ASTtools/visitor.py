@@ -1,5 +1,4 @@
 from __future__ import annotations
-from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from ASTtools.namespace import Namespace
@@ -188,8 +187,6 @@ class ASTLinker(GenericVisitor):
         return node
 
     def visitProgram(self, node: nodes.Program):
-        node.owner = self.current_scope
-        node.parent_node = self.parent_node
         self.current_scope = node
         self.parent_node = node
 
@@ -201,6 +198,9 @@ class ASTLinker(GenericVisitor):
         return node
 
     def visitGenericObject(self, node: nodes.GenericObject):
+        node.owner = self.current_scope
+        node.parent_node = self.parent_node
+
         result = self.visitProgram(node)
         node.namespace.parent = node.owner.namespace
         return result
@@ -210,6 +210,8 @@ class ASTLinker(GenericVisitor):
         node.owner = self.current_scope
         node.parent_node = self.parent_node
 
+        # return self.visitGenericObject(node)
+
         return node
 
     def visitPowerFrame(self, node: nodes.PowerFrame):
@@ -218,87 +220,5 @@ class ASTLinker(GenericVisitor):
     def visitDeonticFrame(self, node: nodes.DeonticFrame):
         return self.visitGenericObject(node)
 
-
-class ASTPrinter(GenericVisitor):
-    replace_children = False
-
-    def __init__(self) -> None:
-        self.indent_ctr = 0
-        self.indent_symbol = "\t"
-        self.inline_ctr = 0
-
-    @contextmanager
-    def print_inline(self):
-        self.inline_ctr += 1
-        yield
-        self.inline_ctr -= 1
-
-    @property
-    def inline(self):
-        return self.inline_ctr > 0
-
-    @property
-    def indent(self):
-        return self.indent_symbol * self.indent_ctr
-
-    def print(self, line: str):
-        if self.inline:
-            print(line, end='')
-        else:
-            print(self.indent + line)
-
-    def visitNode(self, node: nodes.Node):
-        raise NotImplementedError
-
-    def plus_minus(self, active: bool):
-        return '+' if active else '-'
-
-    def visitProgram(self, node: nodes.Program):
-        # TOOD body does not contain objects created via REPL
-        for n in node.body:
-            self.visit(n)
-            self.print
-
-    def visitGenericObject(self, node: nodes.GenericObject):
-        active = self.plus_minus(node.active)
-        self.print(f"{active}{node.full_name} {[d.full_name for d in node.all_descriptors]} {{")
-        self.indent_ctr += 1
-
-        self.visitChildren(node)
-
-        self.indent_ctr -= 1
-        self.print("}")
-
-    def visitPowerFrame(self, node: nodes.PowerFrame):
-        active = self.plus_minus(node.active)
-        self.print(f"{active}power {node.full_name or ''} {{")
-        self.indent_ctr += 1
-
-        self.print(f"holder: {node.holder.name}")
-        self.print(f"action: {node.action.name}")
-
-        self.print(f"consequence: {self.visit(node.consequence)}")
-
-        self.indent_ctr -= 1
-        self.print("}")
-
-    def visitReactiveRule(self, node: nodes.ReactiveRule):
-        with self.print_inline():
-            self.print(f"{self.visit(node.event)} => {self.visit(node.reaction)}")
-
     def visitTransformationalRule(self, node: nodes.TransformationalRule):
-        self.print(f"{self.visit(node.antecedent)} -> {self.visit(node.consequent)}")
-
-    def visitActionReference(self, node: nodes.ActionReference):
-        agent = f"{(node.agent.resolve().full_name)}." if node.agent else ''
-        self.print(f"{agent}{node.name} {{{node.args or ''}}}")
-
-    def visitProductionEventReference(self, node: nodes.ProductionEventReference):
-        self.print(self.plus_minus(node.new_state) + node.object.resolve().full_name)
-
-    def visitObjectReference(self, node: nodes.ObjectReference):
-        try:
-            self.print(node.resolve().full_name)
-        # TODO double-check the error raised by resolve
-        except ValueError:
-            self.print(node.name)
+        return super().visitTransformationalRule(node)

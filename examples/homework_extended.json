@@ -1,0 +1,59 @@
+[
+    {
+        "object": "person",
+        "content": [
+            {"atomics": ["parent"]},
+            {
+                "object": "natural-parent",
+                "content": [],
+                "initial_descriptors": ["parent"]
+            },
+            {
+                "object": "adoptive-parent",
+                "content": [],
+                "initial_descriptors": ["parent"]
+            }
+        ]
+    },
+    {
+        "object": "child",
+        "content": [],
+        "initial_descriptors": ["person"]
+    },
+    {
+        "object": "teacher",
+        "content": [
+            {"atomics": ["student"]}
+        ],
+        "initial_descriptors": ["person"]
+    },
+    {
+        "object": "daisy",
+        "content": [],
+        "initial_descriptors": ["teacher"]
+    },
+    {
+        "object": "charlie",
+        "content": [],
+        "initial_descriptors": ["child", {"scope": "daisy", "name": "student"}]
+    },
+    {
+        "object": "alice",
+        "content": [],
+        "initial_descriptors": ["person", {"scope": "charlie", "name": "natural-parent"}]
+    },
+    {
+        "object": "bob",
+        "content": [],
+        "initial_descriptors": ["person", {"scope": "charlie", "name": "adoptive-parent"}]
+    },
+    {
+        "position": "power",
+        "holder": "teacher",
+        "action": {
+            "event": "#assign-homework",
+            "refinement": {"student": {"scope": "holder", "name": "student"}}
+        },
+        "consequence": {"plus": {"object": "homework"}}
+    }
+]

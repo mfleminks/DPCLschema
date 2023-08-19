@@ -84,6 +84,7 @@ def test_deontic_frame(with_duty: nodes.CompoundFrame, alice):
     pr_kill: nodes.DeonticFrame = instance.get_attribute('pr_kill')
     violated = pr_kill.get_attribute('violated')
     assert violated is pr_kill.violation_object
+    assert violated.owner is pr_kill
     assert pr_kill is not with_duty.body[0]
 
     events.ActionHandler.get_event('#kill').fire(holder=alice, _bypass_powers=True)

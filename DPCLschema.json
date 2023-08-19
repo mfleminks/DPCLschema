@@ -210,9 +210,6 @@
         },
         {
           "$ref": "#/$defs/deontic_frame"
-        },
-        {
-          "$ref": "#/$defs/import_reference"
         }
       ]
     },
@@ -476,52 +473,31 @@
           "$ref": "#/$defs/action"
         },
         "violation": {
-          "type": "object",
-          "properties": {
-            "expression": {
+          "oneOf": [
+            {
               "$ref": "#/$defs/boolean_expression"
-            },
-            "event": {
+            },{
               "$ref": "#/$defs/event"
             }
-          },
-          "oneOf": [
-            { "required": ["expression"] },
-            { "required": ["event"] }
-          ],
-          "additionalProperties": false
+          ]
         },
         "fulfillment": {
-          "type": "object",
-          "properties": {
-            "expression": {
+          "oneOf": [
+            {
               "$ref": "#/$defs/boolean_expression"
-            },
-            "event": {
+            },{
               "$ref": "#/$defs/event"
             }
-          },
-          "oneOf": [
-            { "required": ["expression"] },
-            { "required": ["event"] }
-          ],
-          "additionalProperties": false
+          ]
         },
         "termination": {
-          "type": "object",
-          "properties": {
-            "expression": {
-              "$ref": "#/$defs/external_expression"
-            },
-            "event": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/boolean_expression"
+            },{
               "$ref": "#/$defs/event"
             }
-          },
-          "oneOf": [
-            { "required": ["expression"] },
-            { "required": ["event"] }
-          ],
-          "additionalProperties": false
+          ]
         },
         "alias": {
           "$ref": "#/$defs/atomic_object"

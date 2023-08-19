@@ -2,6 +2,7 @@ import cmd
 import json
 from typing import IO
 import os, glob
+import argparse
 
 import jsonschema
 
@@ -13,6 +14,8 @@ from ASTtools import nodes, namespace
 # Fix delimiters for tab completion
 # taken from https://stackoverflow.com/questions/16826172/filename-tab-completion-in-cmd-cmd-of-python
 import readline
+
+from REPL.pretty_print import ASTPrinter
 readline.set_completer_delims(' \t\n')
 
 
@@ -23,8 +26,11 @@ class DPCLShell(cmd.Cmd):
     prompt = default_prompt
     file = None
 
-    def __init__(self, completekey: str = "tab", stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> None:
+    def __init__(self, echo=False, debug=False, completekey: str = "tab", stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> None:
         super().__init__(completekey, stdin, stdout)
+
+        self.echo = echo
+        self.debug = debug
 
         # self.namespace = namespace.Namespace("", None)
         self.program = nodes.Program('<interpreter>', [])
@@ -46,6 +52,9 @@ class DPCLShell(cmd.Cmd):
         self.do_json(line)
 
     def precmd(self, line: str) -> str:
+        if self.echo:
+            self.print(line)
+
         if self.instruction_buffer:
             line = 'json ' + line
 
@@ -55,6 +64,8 @@ class DPCLShell(cmd.Cmd):
         try:
             statement.execute()
         except exceptions.DPCLException as e:
+            if self.debug:
+                raise
             self.print(e)
             self.print("Fatal Error: Execution aborted and program wiped")
 
@@ -90,7 +101,7 @@ class DPCLShell(cmd.Cmd):
         try:
             data = DPCLparser.load_validate_json(arg, self.schema)
         except FileNotFoundError:
-            self.print(f"File {arg} does not exist")
+            self.print(f"File '{arg}' does not exist")
             return
         except jsonschema.exceptions.ValidationError as e:
             self.print(f"Error while validating file:")
@@ -125,13 +136,21 @@ class DPCLShell(cmd.Cmd):
     def do_show(self, arg):
         if not arg:
             # self.print(*self.program.namespace.as_list(), sep="\n")
-            self.program.namespace.print()
-            return
+            # self.program.namespace.print()
+            # return
+            node = self.program
+
+        else:
+            ref = nodes.ObjectReference.from_json(json.loads(arg))
+            visitor.ASTLinker(self.program, self.program).run(ref)
+            node = ref.resolve()
+        ASTPrinter().run(node)
+
 
         # self.print(self.program.get_variable(arg))
-        ref = nodes.ObjectReference.from_json(json.loads(arg))
-        visitor.ASTLinker(self.program, self.program).run(ref)
-        self.print(ref.resolve())
+        # ref = nodes.ObjectReference.from_json(json.loads(arg))
+        # visitor.ASTLinker(self.program, self.program).run(ref)
+        # self.print(ref.resolve())
 
     def do_exit(self, arg):
         self.print("Goodbye!")
@@ -139,4 +158,8 @@ class DPCLShell(cmd.Cmd):
 
 
 if __name__ == '__main__':
-    DPCLShell().cmdloop()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--echo", dest="echo", action="store_true", help="Echo each entered line; usuful when consuming file input")
+    args = parser.parse_args()
+
+    DPCLShell(echo=args.echo).cmdloop()
