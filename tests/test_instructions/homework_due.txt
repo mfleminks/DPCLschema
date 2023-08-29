@@ -7,8 +7,9 @@ load examples/homework.json
     }
 }
 {
-    "agent": "alice",
-    "action": {"event": "#help", "refinement": {"child": "charlie", "homework": "math_homework"}}
+    "entity": "math_homework",
+    "gains": true,
+    "descriptor": "due"
 }
 show {"object": "asked_for_help", "refinement": {"child": "charlie", "parent": "alice", "homework": "math_homework"}}
 show "math_homework"

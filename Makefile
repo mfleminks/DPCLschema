@@ -1,7 +1,7 @@
 .PHONY: check htmlcov
 
 
-env:
+env: requirements.txt
 	python3.10 -m venv env
 	source env/bin/activate ; python -m pip install -r requirements.txt
 

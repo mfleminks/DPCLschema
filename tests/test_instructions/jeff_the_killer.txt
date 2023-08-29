@@ -1,0 +1,8 @@
+load examples/no_killing.json
+{
+    "agent": "jeff",
+    "action": "#kill"
+}
+show "jeff"
+show "pr_kill"
+exit

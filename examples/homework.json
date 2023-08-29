@@ -57,8 +57,7 @@
                 "holder": "parent",
                 "counterparty": "child",
                 "action": {"event": "#help", "refinement": {"child": "child", "homework": "homework"}},
-                "violation": {"entity": "homework", "has": true, "descriptor": "due"},
-                "termination": {"plus": {"scope": "self", "name": "fulfilled"}}
+                "violation": {"entity": "homework", "has": true, "descriptor": "due"}
             }
         ]
     },
