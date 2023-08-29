@@ -80,6 +80,7 @@ def test_instance_identity(empty_compound: nodes.CompoundFrame, alice: nodes.Gen
 
 def test_deontic_frame(with_duty: nodes.CompoundFrame, alice):
     instance = with_duty.get_instance({'person': alice})
+    instance.set_active(True, False)
 
     pr_kill: nodes.DeonticFrame = instance.get_attribute('pr_kill')
     violated = pr_kill.get_attribute('violated')

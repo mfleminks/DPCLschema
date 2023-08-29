@@ -134,7 +134,7 @@ class CompoundInstantiator(GenericVisitor):
         if node is not self.stack[0]:
             return node
 
-        result = self.constructor(self.new_name, node.body.copy())
+        result = self.constructor(self.new_name, node.body.copy(), active=False)
         result.namespace = self.new_namespace
         result.body = node.body.copy()
 

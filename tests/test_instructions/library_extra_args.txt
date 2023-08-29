@@ -1,0 +1,28 @@
+load examples/library.json
+{
+    "agent": "alice",
+    "action": "#register"
+}
+show "alice"
+{
+    "agent": "alice",
+    "action": {
+        "event": "#borrow",
+        "refinement": {
+            "item": "dracula"
+        }
+    }
+}
+show {"object": "borrowing", "refinement": {"borrower": "alice", "lender": "library", "item": "dracula"}}
+{
+    "agent": "alice",
+    "action": {
+        "event": "#return",
+        "refinement": {
+            "item": "dracula",
+            "from": "library"
+        }
+    }
+}
+show {"object": "borrowing", "refinement": {"borrower": "alice", "lender": "library", "item": "dracula"}}
+exit
