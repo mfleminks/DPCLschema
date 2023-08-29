@@ -1495,6 +1495,9 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         self._fulfillment = fulfillment
         self._termination = termination
 
+        self.selectors = action.args.copy()
+        self.selectors['holder'] = self.holder
+
         self.create_internal_rules()
 
     def visit_children(self, visitor: GenericVisitor):
@@ -1588,6 +1591,22 @@ class DeonticFrame(GenericObject, EventListener, Statement):
         return True
 
     def notify(self, **kwargs):
+        if not self.active:
+            return False
+
+        action_args = kwargs
+
+        context = Namespace('<power_args>', self.namespace, action_args)
+
+        for name, s in self.selectors.items():
+            arg = action_args.get(name)
+            s = s.resolve(context=context)
+            if arg is None:
+                return False
+            if s.matches(arg):
+                continue
+
+            return False
 
         if self.position == 'duty':
             self.fulfillment_object.set_active(True, transformational=False)
@@ -1829,6 +1848,10 @@ class ReactiveRule(Node, EventListener, Statement):
 
         self.name = alias
 
+        if isinstance(self.event, ActionReference):
+            self.selectors = self.event.args.copy()
+            # self.selectors['holder'] = self.event
+
         # TODO move this to after resolving references
         # self.event.add_callback(self)
 
@@ -1837,8 +1860,24 @@ class ReactiveRule(Node, EventListener, Statement):
         return self.owner.active
 
     def notify(self, **kwargs):
-        if self.active:
-            self.reaction.fire(**kwargs)
+        if not self.active:
+            return
+
+        if isinstance(self.event, ActionReference):
+            action_args = kwargs
+            context = Namespace('<power_args>', self.owner.namespace, action_args)
+
+            for name, s in self.selectors.items():
+                arg = action_args.get(name)
+                s = s.resolve(context=context)
+                if arg is None:
+                    return False
+                if s.matches(arg):
+                    continue
+
+                return False
+
+        self.reaction.fire(**kwargs)
 
     def execute(self) -> None:
         # Initialize object defined within rule
